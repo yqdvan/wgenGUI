@@ -1,0 +1,11 @@
+# wgen_GUI 配置文件示例
+# 使用YAML语法指定Verilog模块名与文件路径的映射
+
+# 示例1：简单模块
+simple_module: ./examples/simple_module.v
+
+# 示例2：带参数的模块
+param_module: ./examples/param_module.v
+
+# 示例3：复杂模块
+complex_module: ./examples/complex_module.v
