@@ -1,10 +1,14 @@
-from verilog_models import VerilogModule, VerilogPort, VerilogModuleCollection
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 """
 Verilog模块数据结构使用示例
 
 这个示例展示了如何使用VerilogModule、VerilogPort和VerilogModuleCollection类来描述Verilog模块及其连接关系。
 """
+
+# 导入需要的类
+from verilog_models import VerilogModule, VerilogPort, VerilogModuleCollection
 
 # 示例1: 创建一个简单的Verilog模块
 print("===== 示例1: 创建一个简单的Verilog模块 =====")
@@ -71,26 +75,28 @@ module_collection.add_module(slave_module)
 
 # 建立模块之间的连接
 module_collection.add_connection(
-    source_module="master_module", 
-    source_port="clk", 
-    dest_module="slave_module", 
-    dest_port="clk"
+    source_module_name="master_module", 
+    source_port_name="clk", 
+    dest_module_name="slave_module", 
+    dest_port_name="clk"
 )
 module_collection.add_connection(
-    source_module="master_module", 
-    source_port="data_out", 
-    dest_module="slave_module", 
-    dest_port="data_in"
+    source_module_name="master_module", 
+    source_port_name="data_out", 
+    dest_module_name="slave_module", 
+    dest_port_name="data_in"
 )
 module_collection.add_connection(
-    source_module="master_module", 
-    source_port="valid_out", 
-    dest_module="slave_module", 
-    dest_port="valid_in"
+    source_module_name="master_module", 
+    source_port_name="valid_out", 
+    dest_module_name="slave_module", 
+    dest_port_name="valid_in"
 )
 
 # 打印模块层次结构摘要
 print(module_collection.get_hierarchy_summary())
+
+# exit(0)
 
 # 示例4: 查看端口的连接信息
 print("===== 示例4: 查看端口的连接信息 =====")
@@ -109,11 +115,95 @@ bidirectional_module = VerilogModule(name="bidirectional_module")
 bidirectional_module.add_port(VerilogPort(name="bus", direction="inout", width={'high': 31, 'low': 0}))
 bidirectional_module.add_port(VerilogPort(name="oe", direction="input"))
 
+# 添加到模块集合
+module_collection.add_module(bidirectional_module)
+
 print(bidirectional_module)
 
-# 为双向端口设置源和目的地
-bus_port = bidirectional_module.get_port("bus")
-if bus_port:
-    bus_port.source = "other_module.data_out"
-    bus_port.destination = "another_module.data_in"
-    print(f"\n双向端口连接信息: {bus_port}")
+# 示例6: 演示端口位宽不匹配时的部分位宽连接
+print("\n===== 示例6: 端口位宽不匹配时的部分位宽连接 =====")
+
+# 创建一个宽端口模块
+broad_module = VerilogModule(name="broad_module")
+broad_module.add_port(VerilogPort(name="wide_data", direction="output", width={'high': 15, 'low': 0}))  # 16位宽
+
+# 创建一个窄端口模块
+narrow_module = VerilogModule(name="narrow_module")
+narrow_module.add_port(VerilogPort(name="low_data", direction="input", width={'high': 7, 'low': 0}))   # 8位宽(低8位)
+narrow_module.add_port(VerilogPort(name="high_data", direction="input", width={'high': 7, 'low': 0}))  # 8位宽(高8位)
+
+# 添加到模块集合
+module_collection.add_module(broad_module)
+module_collection.add_module(narrow_module)
+
+# 连接低位数据 (wide_data[7:0] -> low_data[7:0])
+module_collection.add_connection(
+    source_module_name="broad_module",
+    source_port_name="wide_data",
+    dest_module_name="narrow_module",
+    dest_port_name="low_data",
+    source_bit_range={'high': 7, 'low': 0}
+)
+
+# 连接高位数据 (wide_data[15:8] -> high_data[7:0])
+module_collection.add_connection(
+    source_module_name="broad_module",
+    source_port_name="wide_data",
+    dest_module_name="narrow_module",
+    dest_port_name="high_data",
+    source_bit_range={'high': 15, 'low': 8}
+)
+
+# 打印位宽连接信息
+print("部分位宽连接信息:")
+for conn in module_collection.get_connections_for_module("broad_module"):
+    print(f"  {conn}")
+
+# 示例7: 演示获取连接端口的详细信息
+print("\n===== 示例7: 获取连接端口的详细信息 =====")
+
+# 获取连接的端口对象
+high_data_port = narrow_module.get_port("high_data")
+if high_data_port and high_data_port.source:
+    print(f"narrow_module.high_data 的源端口信息:")
+    print(f"  模块名称: {high_data_port.source.father_module.name}")
+    print(f"  端口名称: {high_data_port.source.name}")
+    print(f"  端口方向: {high_data_port.source.direction}")
+    print(f"  端口位宽: {high_data_port.source.get_bit_width()}位")
+
+# 示例8: 创建多个目标连接
+print("\n===== 示例8: 创建多个目标连接 =====")
+
+# 创建一个分发模块
+distributor_module = VerilogModule(name="distributor_module")
+distributor_module.add_port(VerilogPort(name="clk", direction="output"))
+
+# 创建多个接收模块
+receiver1_module = VerilogModule(name="receiver1_module")
+receiver1_module.add_port(VerilogPort(name="clk", direction="input"))
+
+receiver2_module = VerilogModule(name="receiver2_module")
+receiver2_module.add_port(VerilogPort(name="clk", direction="input"))
+
+# 添加到模块集合
+module_collection.add_module(distributor_module)
+module_collection.add_module(receiver1_module)
+module_collection.add_module(receiver2_module)
+
+# 分发时钟信号到多个接收模块
+module_collection.add_connection(
+    source_module_name="distributor_module",
+    source_port_name="clk",
+    dest_module_name="receiver1_module",
+    dest_port_name="clk"
+)
+
+module_collection.add_connection(
+    source_module_name="distributor_module",
+    source_port_name="clk",
+    dest_module_name="receiver2_module",
+    dest_port_name="clk"
+)
+
+# 打印分发模块的连接摘要
+print(distributor_module.get_connections_summary())
