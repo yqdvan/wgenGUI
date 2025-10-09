@@ -385,6 +385,48 @@ class VerilogModuleCollection:
         if dest_port.is_input() or dest_port.is_inout():
             dest_port.source = source_port
     
+    def remove_connection(self, source_module_name, source_port_name, dest_module_name, dest_port_name):
+        """
+        删除模块之间的连接
+        
+        参数:
+            source_module_name (str): 源模块名称
+            source_port_name (str): 源模块端口名称
+            dest_module_name (str): 目标模块名称
+            dest_port_name (str): 目标模块端口名称
+        
+        返回:
+            bool: 如果成功删除连接则返回True，否则返回False
+        """
+        # 查找匹配的连接
+        connection_to_remove = None
+        for conn in self.connections:
+            if (conn.source_module_name == source_module_name and 
+                conn.source_port.name == source_port_name and 
+                conn.dest_module_name == dest_module_name and 
+                conn.dest_port.name == dest_port_name):
+                connection_to_remove = conn
+                break
+        
+        if not connection_to_remove:
+            return False
+        
+        # 更新端口的源和目的地信息
+        source_port = connection_to_remove.source_port
+        dest_port = connection_to_remove.dest_port
+        
+        # 移除源端口的目的地引用
+        if source_port.destination == dest_port:
+            source_port.destination = None
+        
+        # 移除目标端口的源引用
+        if dest_port.source == source_port:
+            dest_port.source = None
+        
+        # 从连接列表中删除连接
+        self.connections.remove(connection_to_remove)
+        return True
+    
     def get_connections_for_module(self, module_name):
         """
         获取与指定模块相关的所有连接

@@ -205,5 +205,46 @@ module_collection.add_connection(
     dest_port_name="clk"
 )
 
+# 打印分发模块的连接信息
+print("分发模块的连接信息:")
+for conn in module_collection.get_connections_for_module("distributor_module"):
+    print(f"  {conn}")
+
+# 示例9: 演示删除连接操作
+print("\n===== 示例9: 演示删除连接操作 =====")
+
+# 打印删除连接前的状态
+print("删除连接前的时钟连接信息:")
+for conn in module_collection.get_connections_for_module("distributor_module"):
+    print(f"  {conn}")
+
+# 删除receiver1_module的时钟连接
+removed = module_collection.remove_connection(
+    source_module_name="distributor_module",
+    source_port_name="clk",
+    dest_module_name="receiver1_module",
+    dest_port_name="clk"
+)
+
+if removed:
+    print("成功删除连接: distributor_module.clk -> receiver1_module.clk")
+else:
+    print("删除连接失败: 未找到匹配的连接")
+
+# 打印删除连接后的状态
+print("\n删除连接后的时钟连接信息:")
+for conn in module_collection.get_connections_for_module("distributor_module"):
+    print(f"  {conn}")
+
+# 检查端口的源引用是否已清除
+source_port = distributor_module.get_port("clk")
+receiver1_port = receiver1_module.get_port("clk")
+receiver2_port = receiver2_module.get_port("clk")
+
+print("\n端口连接状态检查:")
+print(f"distributor_module.clk的destination引用: {source_port.destination}")
+print(f"receiver1_module.clk的source引用: {receiver1_port.source}")
+print(f"receiver2_module.clk的source引用: {receiver2_port.source}")
+
 # 打印分发模块的连接摘要
 print(distributor_module.get_connections_summary())
