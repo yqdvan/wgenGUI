@@ -21,6 +21,20 @@ class WGenGUI:
         self.master_module = None
         self.slave_module = None
         
+        # 存储缩放相关的属性
+        self.master_scale = 1.0  # Master电路图的缩放比例
+        self.slave_scale = 1.0   # Slave电路图的缩放比例
+        self.selected_canvas = None  # 当前选中的canvas
+        
+        # 存储画布偏移量
+        self.master_offset_x = 0  # Master画布的X偏移
+        self.master_offset_y = 0  # Master画布的Y偏移
+        self.slave_offset_x = 0   # Slave画布的X偏移
+        self.slave_offset_y = 0   # Slave画布的Y偏移
+        self.is_dragging = False  # 是否正在拖动
+        self.last_x = 0           # 上一次鼠标X坐标
+        self.last_y = 0           # 上一次鼠标Y坐标
+        
         # 创建主界面布局
         self._create_layout()
         
@@ -28,17 +42,53 @@ class WGenGUI:
         self._open_config_file()
     
     def _create_layout(self):
-        """创建GUI布局"""
+        """创建GUI布局
+        
+        此函数作为布局创建的入口，调用三个子函数分别创建：
+        1. 基础布局结构（主分割器、左右面板）
+        2. 左侧面板内容（互联hierarchy、模块列表）
+        3. 右侧面板内容（端口列表和电路示意图）
+        """
+        # 创建基础布局结构
+        self._create_basic_layout()
+        
+        # 创建左侧面板内容
+        self._create_left_panel()
+        
+        # 创建右侧面板内容
+        self._create_right_panel()
+        
+        # 添加菜单
+        self._create_menu()
+        
+    def _create_basic_layout(self):
+        """创建基础布局结构
+        
+        负责创建主分割器、左侧面板和右侧面板的基本框架。
+        设置主窗口的整体布局结构和比例。
+        """
         # 创建主分割器（左右布局）
         self.main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         self.main_paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 左侧面板
-        left_frame = ttk.Frame(self.main_paned, width=400)
-        self.main_paned.add(left_frame, weight=1)
+        # 创建左侧面板
+        self.left_frame = ttk.Frame(self.main_paned)
+        self.main_paned.add(self.left_frame, weight=1)
         
+        # 创建右侧面板
+        self.right_frame = ttk.Frame(self.main_paned)
+        self.main_paned.add(self.right_frame, weight=4)
+        
+    def _create_left_panel(self):
+        """创建左侧面板内容
+        
+        负责创建左侧面板的所有组件，包括：
+        1. 上下分割器
+        2. 互联hierarchy文本框
+        3. 模块列表Treeview及右键菜单
+        """
         # 左侧上下分割器
-        left_paned = ttk.PanedWindow(left_frame, orient=tk.VERTICAL)
+        left_paned = ttk.PanedWindow(self.left_frame, orient=tk.VERTICAL)
         left_paned.pack(fill=tk.BOTH, expand=True)
         
         # 左侧上部分（互联hierarchy）
@@ -63,51 +113,108 @@ class WGenGUI:
         # 绑定右键菜单事件
         self.modules_tree.bind("<Button-3>", self._show_module_context_menu)
         
-        # 创建右键菜单
+        # 创建模块右键菜单
         self.module_menu = tk.Menu(self.root, tearoff=0)
         self.module_menu.add_command(label="设为Master", command=self._set_as_master)
         self.module_menu.add_command(label="设为Slave", command=self._set_as_slave)
         
-        # 右侧面板
-        right_frame = ttk.Frame(self.main_paned, width=800)
-        self.main_paned.add(right_frame, weight=2)
+    def _create_right_panel(self):
+        """创建右侧面板内容
         
+        负责创建右侧面板的所有组件，包括：
+        1. 设置网格布局
+        2. Master输出端口列表
+        3. Slave输入端口列表
+        4. Master电路示意图画布
+        5. Slave电路示意图画布
+        6. 端口右键菜单
+        """
         # 右侧网格布局
-        right_frame.grid_rowconfigure(0, weight=1)
-        right_frame.grid_rowconfigure(1, weight=1)
-        right_frame.grid_columnconfigure(0, weight=1)
-        right_frame.grid_columnconfigure(1, weight=1)
+        self.right_frame.grid_rowconfigure(0, weight=1)
+        self.right_frame.grid_rowconfigure(1, weight=1)
+        self.right_frame.grid_columnconfigure(0, weight=1)
+        self.right_frame.grid_columnconfigure(1, weight=1)
         
         # 右上部分（Master输出端口）
-        master_ports_frame = ttk.LabelFrame(right_frame, text="Master输出端口")
+        master_ports_frame = ttk.LabelFrame(self.right_frame, text="Master输出端口")
         master_ports_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         
-        self.master_ports_text = tk.Text(master_ports_frame, wrap=tk.WORD)
-        self.master_ports_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # 创建内部容器框架
+        master_ports_inner_frame = ttk.Frame(master_ports_frame)
+        master_ports_inner_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # 使用Treeview替代Text控件显示端口列表
+        self.master_ports_tree = ttk.Treeview(master_ports_inner_frame, columns=("port", "connected"), show="headings")
+        self.master_ports_tree.heading("port", text="端口名称")
+        self.master_ports_tree.heading("connected", text="是否连接")
+        self.master_ports_tree.column("port", width=200)
+        self.master_ports_tree.column("connected", width=80, anchor="center")
+        self.master_ports_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # 添加滚动条
+        master_ports_scrollbar = ttk.Scrollbar(master_ports_inner_frame, orient=tk.VERTICAL, command=self.master_ports_tree.yview)
+        master_ports_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.master_ports_tree.configure(yscrollcommand=master_ports_scrollbar.set)
+        
+        # 绑定右键菜单事件
+        self.master_ports_tree.bind("<Button-3>", self._show_port_context_menu)
+        # 绑定双击事件，用于切换连接状态
+        self.master_ports_tree.bind("<Double-1>", lambda event: self._on_port_double_click(self.master_ports_tree, event))
         
         # 右下部分（Slave输入端口）
-        slave_ports_frame = ttk.LabelFrame(right_frame, text="Slave输入端口")
+        slave_ports_frame = ttk.LabelFrame(self.right_frame, text="Slave输入端口")
         slave_ports_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
         
-        self.slave_ports_text = tk.Text(slave_ports_frame, wrap=tk.WORD)
-        self.slave_ports_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # 创建内部容器框架
+        slave_ports_inner_frame = ttk.Frame(slave_ports_frame)
+        slave_ports_inner_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # 使用Treeview替代Text控件显示端口列表
+        self.slave_ports_tree = ttk.Treeview(slave_ports_inner_frame, columns=("port", "connected"), show="headings")
+        self.slave_ports_tree.heading("port", text="端口名称")
+        self.slave_ports_tree.heading("connected", text="是否连接")
+        self.slave_ports_tree.column("port", width=200)
+        self.slave_ports_tree.column("connected", width=80, anchor="center")
+        self.slave_ports_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # 添加滚动条
+        slave_ports_scrollbar = ttk.Scrollbar(slave_ports_inner_frame, orient=tk.VERTICAL, command=self.slave_ports_tree.yview)
+        slave_ports_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.slave_ports_tree.configure(yscrollcommand=slave_ports_scrollbar.set)
+        
+        # 绑定右键菜单事件
+        self.slave_ports_tree.bind("<Button-3>", self._show_port_context_menu)
+        # 绑定双击事件，用于切换连接状态
+        self.slave_ports_tree.bind("<Double-1>", lambda event: self._on_port_double_click(self.slave_ports_tree, event))
+        
+        # 创建端口右键菜单
+        self.port_menu = tk.Menu(self.root, tearoff=0)
+        self.port_menu.add_command(label="optionA", command=lambda: self._port_menu_action("optionA", self.current_tree))
+        self.port_menu.add_command(label="optionB", command=lambda: self._port_menu_action("optionB", self.current_tree))
         
         # 左下部分（Master电路示意图）
-        master_schematic_frame = ttk.LabelFrame(right_frame, text="Master电路示意图")
+        master_schematic_frame = ttk.LabelFrame(self.right_frame, text="Master电路示意图")
         master_schematic_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
         
         self.master_canvas = tk.Canvas(master_schematic_frame, bg="white")
         self.master_canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # 绑定鼠标事件
+        self.master_canvas.bind("<Button-1>", lambda event: self._on_drag_start(event, "master"))
+        self.master_canvas.bind("<B1-Motion>", lambda event: self._on_drag_motion(event, "master"))
+        self.master_canvas.bind("<ButtonRelease-1>", self._on_drag_end)
+        self.master_canvas.bind("<MouseWheel>", lambda event: self._on_mousewheel(event, "master"))
         
         # 右下部分（Slave电路示意图）
-        slave_schematic_frame = ttk.LabelFrame(right_frame, text="Slave电路示意图")
+        slave_schematic_frame = ttk.LabelFrame(self.right_frame, text="Slave电路示意图")
         slave_schematic_frame.grid(row=1, column=1, sticky="nsew", padx=5, pady=5)
         
         self.slave_canvas = tk.Canvas(slave_schematic_frame, bg="white")
         self.slave_canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # 添加菜单
-        self._create_menu()
+        # 绑定鼠标事件
+        self.slave_canvas.bind("<Button-1>", lambda event: self._on_drag_start(event, "slave"))
+        self.slave_canvas.bind("<B1-Motion>", lambda event: self._on_drag_motion(event, "slave"))
+        self.slave_canvas.bind("<ButtonRelease-1>", self._on_drag_end)
+        self.slave_canvas.bind("<MouseWheel>", lambda event: self._on_mousewheel(event, "slave"))
     
     def _create_menu(self):
         """创建菜单栏"""
@@ -118,8 +225,29 @@ class WGenGUI:
         file_menu.add_separator()
         file_menu.add_command(label="退出", command=self.root.quit)
         
+        # 添加文件按钮
         menu_bar.add_cascade(label="文件", menu=file_menu)
+
+        # 添加创建连接按钮
+        menu_bar.add_command(label="创建连接", command=self._create_connection)
+
+        # 添加关于信息
+        menu_bar.add_command(label="关于", command=self._show_about_info)   
+
         self.root.config(menu=menu_bar)
+
+    def _create_connection(self):
+        """创建连接按钮的响应函数，显示选中的master和slave端口"""
+        # 获取master端口列表中选中的端口
+        selected_master_items = self.master_ports_tree.selection()
+        master_port = "未选中" if not selected_master_items else self.master_ports_tree.item(selected_master_items[0])['values'][0]
+        
+        # 获取slave端口列表中选中的端口
+        selected_slave_items = self.slave_ports_tree.selection()
+        slave_port = "未选中" if not selected_slave_items else self.slave_ports_tree.item(selected_slave_items[0])['values'][0]
+        
+        # 弹出messagebox显示信息
+        messagebox.showinfo("连接信息", f"Master输出端口选中：{master_port}\nSlave输入端口选中：{slave_port}")
     
     def _open_config_file(self):
         """打开配置文件对话框"""
@@ -233,9 +361,13 @@ class WGenGUI:
         """更新Master相关显示"""
         if self.master_module:
             # 更新输出端口显示
-            self.master_ports_text.delete(1.0, tk.END)
+            # 清空现有列表
+            for item in self.master_ports_tree.get_children():
+                self.master_ports_tree.delete(item)
+            
+            # 添加端口信息，默认连接状态为否
             for port in self.master_module['outputs']:
-                self.master_ports_text.insert(tk.END, f"{port}\n")
+                self.master_ports_tree.insert('', tk.END, values=(port, "否"))
             
             # 更新电路示意图
             self._draw_module_schematic(self.master_canvas, self.master_module)
@@ -244,12 +376,65 @@ class WGenGUI:
         """更新Slave相关显示"""
         if self.slave_module:
             # 更新输入端口显示
-            self.slave_ports_text.delete(1.0, tk.END)
+            # 清空现有列表
+            for item in self.slave_ports_tree.get_children():
+                self.slave_ports_tree.delete(item)
+            
+            # 添加端口信息，默认连接状态为否
             for port in self.slave_module['inputs']:
-                self.slave_ports_text.insert(tk.END, f"{port}\n")
+                self.slave_ports_tree.insert('', tk.END, values=(port, "否"))
             
             # 更新电路示意图
             self._draw_module_schematic(self.slave_canvas, self.slave_module)
+    
+    def _show_port_context_menu(self, event):
+        """显示端口右键菜单"""
+        # 获取点击的控件和项目
+        widget = event.widget
+        item = widget.identify_row(event.y)
+        if item:
+            # 选中点击的项目
+            widget.selection_set(item)
+            widget.focus(item)
+            # 记录当前操作的tree控件
+            self.current_tree = widget
+            # 显示右键菜单
+            self.port_menu.post(event.x_root, event.y_root)
+    
+    def _port_menu_action(self, action, tree=None):
+        """端口右键菜单操作"""
+        # 获取当前选中的端口信息，如果指定了tree则直接使用该tree
+        if tree is not None:
+            selected_items = tree.selection()
+            if selected_items:
+                port_name = tree.item(selected_items[0])['values'][0]
+                messagebox.showinfo("操作提示", f"你点击了{action}操作，端口：{port_name}")
+        else:
+            # 原来的逻辑作为后备
+            selected_master_items = self.master_ports_tree.selection()
+            selected_slave_items = self.slave_ports_tree.selection()
+            
+            if selected_master_items:
+                port_name = self.master_ports_tree.item(selected_master_items[0])['values'][0]
+                messagebox.showinfo("操作提示", f"你点击了{action}操作，端口：{port_name}")
+            elif selected_slave_items:
+                port_name = self.slave_ports_tree.item(selected_slave_items[0])['values'][0]
+                messagebox.showinfo("操作提示", f"你点击了{action}操作，端口：{port_name}")
+    
+    def _toggle_port_connection(self, tree, item):
+        """切换端口连接状态"""
+        current_state = tree.item(item)['values'][1]
+        new_state = "是" if current_state == "否" else "否"
+        port_name = tree.item(item)['values'][0]
+        tree.item(item, values=(port_name, new_state))
+    
+    def _on_port_double_click(self, tree, event):
+        """处理端口双击事件，切换连接状态"""
+        # 获取双击的项目
+        item = tree.identify_row(event.y)
+        if item:
+            # 切换连接状态
+            self._toggle_port_connection(tree, item)
     
     def _draw_module_schematic(self, canvas, module):
         """绘制模块电路示意图"""
@@ -265,36 +450,148 @@ class WGenGUI:
             width = 300
             height = 200
         
-        # 绘制模块矩形
-        rect_width = min(width - 40, 200)
-        rect_height = min(height - 40, 150)
-        x1 = (width - rect_width) // 2
-        y1 = (height - rect_height) // 2
+        # 确定当前使用的缩放比例和偏移量
+        if canvas == self.master_canvas:
+            scale = self.master_scale
+            offset_x = self.master_offset_x
+            offset_y = self.master_offset_y
+        else:
+            scale = self.slave_scale
+            offset_x = self.slave_offset_x
+            offset_y = self.slave_offset_y
+        
+        # 计算基础尺寸，考虑缩放
+        base_width = min(width - 40, 200) * scale
+        base_height = 100  # 基础高度
+        
+        # 根据端口数量调整矩形高度，确保每个端口至少有20像素的空间
+        input_count = len(module['inputs'])
+        output_count = len(module['outputs'])
+        max_port_count = max(input_count, output_count)
+        port_based_height = 40 + max_port_count * 20  # 40是边距，每个端口20像素
+        
+        # 综合考虑画布高度和端口需求的高度
+        rect_width = base_width
+        rect_height = min(height - 40, max(base_height, port_based_height)) * scale
+        
+        # 计算中心位置，并考虑偏移量
+        center_x = (width // 2) + offset_x
+        center_y = (height // 2) + offset_y
+        x1 = center_x - rect_width // 2
+        y1 = center_y - rect_height // 2
         x2 = x1 + rect_width
         y2 = y1 + rect_height
         
+        # 绘制模块矩形
         canvas.create_rectangle(x1, y1, x2, y2, outline="black", width=2)
         
         # 绘制模块名称
         canvas.create_text((x1 + x2) // 2, y1 + 15, text=module['name'], font=("Arial", 12, "bold"))
         
         # 绘制输入端口
-        input_count = len(module['inputs'])
-        for i, port in enumerate(module['inputs']):
-            y_pos = y1 + 30 + (rect_height - 40) * i / (max(1, input_count - 1))
-            # 绘制端口线
-            canvas.create_line(x1 - 20, y_pos, x1, y_pos, width=2)
-            # 绘制端口名称
-            canvas.create_text(x1 - 25, y_pos, text=port, anchor="e", font=("Arial", 10))
+        if input_count > 0:
+            port_spacing = (rect_height - 40) / (max(1, input_count - 1)) if input_count > 1 else 0
+            for i, port in enumerate(module['inputs']):
+                y_pos = y1 + 30 + port_spacing * i
+                # 绘制端口线
+                canvas.create_line(x1 - 20, y_pos, x1, y_pos, width=2)
+                # 绘制端口名称
+                canvas.create_text(x1 - 25, y_pos, text=port, anchor="e", font=("Arial", 10))
         
         # 绘制输出端口
-        output_count = len(module['outputs'])
-        for i, port in enumerate(module['outputs']):
-            y_pos = y1 + 30 + (rect_height - 40) * i / (max(1, output_count - 1))
-            # 绘制端口线
-            canvas.create_line(x2, y_pos, x2 + 20, y_pos, width=2)
-            # 绘制端口名称
-            canvas.create_text(x2 + 25, y_pos, text=port, anchor="w", font=("Arial", 10))
+        if output_count > 0:
+            port_spacing = (rect_height - 40) / (max(1, output_count - 1)) if output_count > 1 else 0
+            for i, port in enumerate(module['outputs']):
+                y_pos = y1 + 30 + port_spacing * i
+                # 绘制端口线
+                canvas.create_line(x2, y_pos, x2 + 20, y_pos, width=2)
+                # 绘制端口名称
+                canvas.create_text(x2 + 25, y_pos, text=port, anchor="w", font=("Arial", 10))
+                
+    def _on_drag_start(self, event, canvas_type):
+        """开始拖动画布"""
+        # 选中当前画布
+        if canvas_type == "master":
+            self.selected_canvas = self.master_canvas
+        else:
+            self.selected_canvas = self.slave_canvas
+        
+        # 开始拖动
+        self.is_dragging = True
+        self.last_x = event.x
+        self.last_y = event.y
+            
+    def _on_drag_motion(self, event, canvas_type):
+        """拖动画布时的移动事件"""
+        if self.is_dragging:
+            # 计算鼠标移动的距离
+            dx = event.x - self.last_x
+            dy = event.y - self.last_y
+            
+            # 更新偏移量
+            if canvas_type == "master":
+                self.master_offset_x += dx
+                self.master_offset_y += dy
+                if self.master_module:
+                    self._draw_module_schematic(self.master_canvas, self.master_module)
+            else:
+                self.slave_offset_x += dx
+                self.slave_offset_y += dy
+                if self.slave_module:
+                    self._draw_module_schematic(self.slave_canvas, self.slave_module)
+            
+            # 更新上次鼠标位置
+            self.last_x = event.x
+            self.last_y = event.y
+            
+    def _on_drag_end(self, event):
+        """结束拖动画布"""
+        self.is_dragging = False
+        
+    def _select_canvas(self, canvas):
+        """选中canvas"""
+        self.selected_canvas = canvas
+        
+    def _on_mousewheel(self, event, canvas_type):
+        """处理鼠标滚轮事件，实现缩放功能"""
+        # 检查当前画布是否被选中
+        if (canvas_type == "master" and self.selected_canvas == self.master_canvas) or \
+           (canvas_type == "slave" and self.selected_canvas == self.slave_canvas):
+            # 获取滚动方向
+            delta = event.delta
+            # Windows系统中，event.delta为120的倍数，表示滚动的增量
+            zoom_factor = 1.1 if delta > 0 else 0.9
+            
+            # 更新缩放比例
+            if canvas_type == "master":
+                self.master_scale = max(0.5, min(3.0, self.master_scale * zoom_factor))
+                if self.master_module:
+                    self._draw_module_schematic(self.master_canvas, self.master_module)
+            else:
+                self.slave_scale = max(0.5, min(3.0, self.slave_scale * zoom_factor))
+                if self.slave_module:
+                    self._draw_module_schematic(self.slave_canvas, self.slave_module)
+
+    def _show_about_info(self):
+        """显示关于信息对话框
+        
+        弹出一个消息框，显示本软件的著作权、基本功能、版本等信息
+        """
+        about_message = """
+WGenGUI 版本 1.0
+
+著作权所有 © 2023
+
+基本功能：
+- 模块互联层次结构展示
+- Master/Slave模块端口连接管理
+- 电路示意图可视化显示
+- 支持画布缩放和拖动功能
+- 端口连接状态管理
+
+感谢使用本软件！
+        """
+        tk.messagebox.showinfo("关于 WGenGUI", about_message)
 
 if __name__ == "__main__":
     # 检查是否安装了yaml库
