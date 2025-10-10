@@ -1,10 +1,10 @@
 module complex_module (
     // 时钟和复位信号
-    input wire clk,
-    input wire rst_n,
+    input clk,
+    input rst_n,
     
     // 控制信号
-    input wire start,
+    input start,
     output reg done,
     
     // 数据输入端口 - 包含向量和标量
@@ -18,7 +18,7 @@ module complex_module (
     output reg [2:0] status,
     
     // 双向端口
-    inout wire [3:0] bidirectional
+    inout [3:0] bidirectional
 );
     
     // 内部信号定义
