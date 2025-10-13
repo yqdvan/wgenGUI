@@ -1,11 +1,10 @@
 import tkinter as tk
-from tkinter import filedialog, ttk, messagebox, simpledialog
-import os
+from tkinter import ttk, messagebox, simpledialog
 import copy
-import datetime
 from collections import deque
 from modules.verilog_parser import VerilogParser
-from modules.verilog_models import VerilogModuleCollection
+from modules.verilog_models import VerilogModuleCollection, VerilogPort
+from modules.file_handler import FileHandler
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
@@ -19,10 +18,13 @@ class WGenGUI:
         # 创建解析器实例
         self.parser = VerilogParser()
         
+        # 创建文件处理器实例
+        self.file_handler = FileHandler()
+        
         # 存储模块信息
         self.modules = []
-        self.master_module = None
-        self.slave_module = None
+        self.master_module: 'VerilogModule' = None
+        self.slave_module: 'VerilogModule' = None
         
         # 创建模块集合database
         self.collection_DB = None
@@ -156,11 +158,13 @@ class WGenGUI:
         master_ports_inner_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # 使用Treeview替代Text控件显示端口列表
-        self.master_ports_tree = ttk.Treeview(master_ports_inner_frame, columns=("port", "connected"), show="headings")
+        self.master_ports_tree = ttk.Treeview(master_ports_inner_frame, columns=("port","width", "connected"), show="headings")
         self.master_ports_tree.heading("port", text="端口名称")
-        self.master_ports_tree.heading("connected", text="是否连接")
-        self.master_ports_tree.column("port", width=200)
-        self.master_ports_tree.column("connected", width=80, anchor="center")
+        self.master_ports_tree.heading("width", text="Bit(s)")
+        self.master_ports_tree.heading("connected", text="Load")
+        self.master_ports_tree.column("port", width=50)
+        self.master_ports_tree.column("width", width=0)  # 设置默认宽度为10个字符
+        self.master_ports_tree.column("connected", width=200, anchor="center")
         self.master_ports_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         # 添加滚动条
@@ -170,9 +174,9 @@ class WGenGUI:
         
         # 绑定右键菜单事件
         self.master_ports_tree.bind("<Button-3>", self._show_port_context_menu)
-        # 绑定双击事件，用于切换连接状态
+        # 绑定双击事件，用于显示端口信息
         self.master_ports_tree.bind("<Double-1>", lambda event: self._on_port_double_click(self.master_ports_tree, event))
-        
+
         # 右下部分（Slave输入端口）
         slave_ports_frame = ttk.LabelFrame(self.right_frame, text="Slave输入端口")
         slave_ports_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
@@ -182,11 +186,13 @@ class WGenGUI:
         slave_ports_inner_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # 使用Treeview替代Text控件显示端口列表
-        self.slave_ports_tree = ttk.Treeview(slave_ports_inner_frame, columns=("port", "connected"), show="headings")
+        self.slave_ports_tree = ttk.Treeview(slave_ports_inner_frame, columns=("port","width", "connected"), show="headings")
         self.slave_ports_tree.heading("port", text="端口名称")
-        self.slave_ports_tree.heading("connected", text="是否连接")
-        self.slave_ports_tree.column("port", width=200)
-        self.slave_ports_tree.column("connected", width=80, anchor="center")
+        self.slave_ports_tree.heading("width", text="Bit(s)")
+        self.slave_ports_tree.heading("connected", text="Driver")
+        self.slave_ports_tree.column("port", width=50)
+        self.slave_ports_tree.column("width", width=0)  # 设置默认宽度为10个字符
+        self.slave_ports_tree.column("connected", width=200, anchor="center")
         self.slave_ports_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         # 添加滚动条
@@ -196,8 +202,8 @@ class WGenGUI:
         
         # 绑定右键菜单事件
         self.slave_ports_tree.bind("<Button-3>", self._show_port_context_menu)
-        # 绑定双击事件，用于切换连接状态
-        self.slave_ports_tree.bind("<Double-1>", lambda event: self._on_port_double_click(self.slave_ports_tree, event))
+        # # # 绑定双击事件，用于显示端口信息
+        # self.slave_ports_tree.bind("<Double-1>", lambda event: self._on_port_double_click(self.slave_ports_tree, event))
         
         # 创建端口右键菜单
         self.port_menu = tk.Menu(self.root, tearoff=0)
@@ -234,8 +240,8 @@ class WGenGUI:
         
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="打开配置文件", command=self._open_config_file)
-        file_menu.add_separator()
-        file_menu.add_command(label="打开数据库", command=self._open_database)
+        file_menu.add_command(label="打开Database", command=self._open_database)
+        file_menu.add_command(label="保存Database", command=self.save_database)
         file_menu.add_separator()
         file_menu.add_command(label="退出", command=self.root.quit)
         
@@ -245,8 +251,10 @@ class WGenGUI:
         # 添加创建连接按钮
         menu_bar.add_command(label="创建连接", command=self._create_connection)
 
-        # 添加关于信息
-        menu_bar.add_command(label="关于", command=self._show_about_info)   
+        # 添加关于菜单
+        about_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="关于", menu=about_menu)
+        about_menu.add_command(label="关于wgen_GUI", command=self._show_about_info)   
 
         self.root.config(menu=menu_bar)
 
@@ -261,7 +269,7 @@ class WGenGUI:
         slave_port = "未选中" if not selected_slave_items else self.slave_ports_tree.item(selected_slave_items[0])['values'][0]
         
         # 弹出messagebox显示信息
-        messagebox.showinfo("连接信息", f"Master输出端口选中：{master_port}\nSlave输入端口选中：{slave_port}")
+        # messagebox.showinfo("连接信息", f"Master输出端口选中：{master_port}\nSlave输入端口选中：{slave_port}")
 
         from_port_obj = self.master_module.get_port(master_port)
         to_port_obj = self.slave_module.get_port(slave_port)
@@ -271,7 +279,7 @@ class WGenGUI:
                 self.collection_DB.connect_port(from_port_obj, to_port_obj)
                 save_result = self.save_database()
                 messagebox.showinfo("成功", f"已成功连接 {self.master_module.name}.{master_port} -> {self.slave_module.name}.{slave_port} \n{save_result}")
-                 
+                  
             except Exception as e:
                 messagebox.showerror("错误", f"连接端口失败: {str(e)}")
         else:
@@ -279,67 +287,19 @@ class WGenGUI:
     
     def _open_config_file(self):
         """打开配置文件对话框"""
-        file_path = filedialog.askopenfilename(
-            title="打开配置文件",
-            filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")]
-        )
-        
+        file_path = self.file_handler.open_config_file_dialog()
         if file_path:
             self._load_config_file(file_path)
     
-    def _open_database(self):
-        """打开数据库对话框"""
-        file_path = filedialog.askopenfilename(
-            title="打开数据库",
-            filetypes=[("JSON文件", "*.json"), ("所有文件", "*.*")]
-        )
-        
-        if file_path:
-            self._load_database(file_path)
-
-            # 直接使用VerilogModule对象，不再转换为结构体
-            self.modules = self.collection_DB.modules
-
-            # 更新模块列表
-            self._update_modules_list()
-
-            
-    def _load_database(self, file_path):
-        """加载数据库文件并恢复collection_DB
-        
-        参数:
-            file_path (str): 数据库文件的路径
-        """
-        try:
-            # 从文件加载模块集合
-            loaded_collection = VerilogModuleCollection.load_from_file(file_path)
-            
-            if loaded_collection:
-                # 更新collection_DB
-                self.collection_DB = loaded_collection
-                
-                # 显示加载成功信息
-                messagebox.showinfo("成功", f"已成功加载数据库文件: {file_path}")
-            else:
-                messagebox.showerror("错误", "数据库文件加载失败，文件格式可能不正确")
-                
-        except Exception as e:
-            messagebox.showerror("错误", f"加载数据库失败: {str(e)}")
-
-
     def _load_config_file(self, file_path):
         """加载配置文件并更新界面"""
         try:
-            # 解析配置文件
-            self.modules = self.parser.parse_config_file(file_path)
-
-            # 更新模块列表
-            self._update_modules_list()
-            
-            # 显示加载成功信息
-            messagebox.showinfo("成功", f"已成功加载{len(self.modules)}个模块")
-            self._initialize_collection_DB()
-            
+            modules = self.file_handler.load_config_file(file_path, self.parser)
+            if modules:
+                self.modules = modules
+                self._update_modules_list()
+                messagebox.showinfo("成功", f"配置文件已加载，共包含 {len(modules)} 个模块")
+                self._initialize_collection_DB()
         except Exception as e:
             messagebox.showerror("错误", f"加载配置文件失败: {str(e)}")
 
@@ -354,39 +314,39 @@ class WGenGUI:
         except Exception as e:
             messagebox.showerror("错误", f"初始化模块集合数据库失败: {str(e)}")
             
-    def save_database(self) -> str:
-        """深拷贝collection_DB并保存为时间戳命名的json文件到sessions目录"""
-        return_str = "save Failed"
-        if not self.collection_DB:
-            messagebox.showerror("错误", "没有可保存的数据库")
-            return return_str
-            
-        try:
-            # 深拷贝collection_DB
-            db_copy = copy.deepcopy(self.collection_DB)
-            
-            # 创建sessions目录（如果不存在）
-            sessions_dir = os.path.join(os.path.dirname(__file__), "sessions")
-            if not os.path.exists(sessions_dir):
-                os.makedirs(sessions_dir)
+    def _open_database(self):
+        """打开并加载数据库文件，更新模块列表"""
+        file_path = self.file_handler.open_database_dialog()
+        if file_path:
+            try:
+                # 使用FileHandler加载数据库文件
+                self.collection_DB = self.file_handler.load_database(file_path)
                 
-            # 生成包含时间戳的文件名（具体到秒）
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_path = os.path.join(sessions_dir, f"collection_{timestamp}.json")
+                # 显示加载成功信息
+                messagebox.showinfo("成功", f"Database已从 {file_path} 加载")
+
+                # 直接使用VerilogModule对象，不再转换为结构体
+                self.modules = self.collection_DB.modules
+
+                # 更新模块列表
+                self._update_modules_list()
+            except Exception as e:
+                messagebox.showerror("错误", f"加载Database失败: {str(e)}")
             
-            # 调用副本的save_to_file方法保存
-            save_success = db_copy.save_to_file(file_path)
-            
-            if save_success:
-                success_message = f"数据库已成功保存到:\n{file_path}"
-                self.connections_DB_stack.append(db_copy)
-                return success_message
-            else:
-                messagebox.showerror("错误", "保存数据库失败")
-                return return_str
-        except Exception as e:
-            messagebox.showerror("错误", f"保存数据库时发生错误: {str(e)}")
-            return return_str
+    def save_database(self):
+        """保存database到文件"""
+        if self.collection_DB:
+            try:
+                # 使用FileHandler保存数据库
+                save_result = self.file_handler.save_database(self.collection_DB, None, self.connections_DB_stack)
+                if save_result:
+                    return save_result
+            except Exception as e:
+                messagebox.showerror("错误", f"保存Database失败: {str(e)}")
+                return "save Failed"
+        else:
+            messagebox.showwarning("警告", "没有可保存的Database")
+            return "save Failed"
 
     
     def _update_modules_list(self):
@@ -441,6 +401,31 @@ class WGenGUI:
             # 更新Slave显示
             self._update_slave_display()
     
+    def _on_port_double_click(self, tree, event):
+        """处理Master端口Treeview的双击事件"""
+        item = tree.identify_row(event.y)
+        port_name = self.master_ports_tree.item(item)['values'][0]
+        # 查找对应的端口
+        selected_master_port = None
+        for port in self.master_module.get_output_ports():
+            if port.name == port_name:
+                selected_master_port = port
+                break
+        
+        if isinstance(selected_master_port, VerilogPort):
+            # 显示端口详细信息
+            top = tk.Toplevel()
+            top.title("端口详细信息")
+            text = tk.Text(top, wrap=tk.WORD)
+            text.insert(tk.END, str(selected_master_port))
+            text.pack(fill=tk.BOTH, expand=True)
+            text.configure(state=tk.DISABLED)
+            button = ttk.Button(top, text="确定", command=top.destroy)
+            button.pack(pady=5)
+        else:
+            messagebox.showwarning("警告", f"未找到端口 {port_name}")
+        
+
     def _update_master_display(self):
         """更新Master相关显示"""
         if self.master_module:
@@ -452,7 +437,19 @@ class WGenGUI:
             # 添加端口信息，默认连接状态为否
             # 使用VerilogModule对象的方法获取端口，并从VerilogPort对象获取名称
             for port in self.master_module.get_output_ports():
-                self.master_ports_tree.insert('', tk.END, values=(port.name, "否"))
+                if isinstance(port, VerilogPort):
+                    width_show = "[" +str(port.width['high']) +":"+ str(port.width['low']) + "]"
+                    connect_show = "None"
+                    if port.destinations:
+                        # 显示第一个目标端口名称，如果有多个则添加省略号
+                        if len(port.destinations) > 1:
+                            # connect_show = "\n".join([f"{dest.father_module.name} -> {dest.name}" for dest in port.destinations])
+                            connect_show = port.destinations[0].father_module.name + "." + port.destinations[0].name + "...(" + str(len(port.destinations)) + " more lines)"
+                        else:
+                            connect_show = port.destinations[0].name
+                    self.master_ports_tree.insert('', tk.END, values=(port.name,width_show, connect_show), open=True)
+                else:
+                    messagebox.showerror("错误", f"端口 {port.name} 不是 VerilogPort 类型")
             
             # 更新电路示意图
             self._draw_module_schematic(self.master_canvas, self.master_module)
@@ -468,7 +465,14 @@ class WGenGUI:
             # 添加端口信息，默认连接状态为否
             # 使用VerilogModule对象的方法获取端口，并从VerilogPort对象获取名称
             for port in self.slave_module.get_input_ports():
-                self.slave_ports_tree.insert('', tk.END, values=(port.name, "否"))
+                if isinstance(port, VerilogPort):
+                    width_show = "[" +str(port.width['high']) +":"+ str(port.width['low']) + "]"
+                    connect_show = "None"
+                    if port.source:
+                        connect_show = port.source.father_module.name + "." + port.source.name
+                    self.slave_ports_tree.insert('', tk.END, values=(port.name,width_show, connect_show)) 
+                else:
+                    messagebox.showerror("错误", f"端口 {port.name} 不是 VerilogPort 类型")
             
             # 更新电路示意图
             self._draw_module_schematic(self.slave_canvas, self.slave_module)
@@ -506,21 +510,6 @@ class WGenGUI:
             elif selected_slave_items:
                 port_name = self.slave_ports_tree.item(selected_slave_items[0])['values'][0]
                 messagebox.showinfo("操作提示", f"你点击了{action}操作，端口：{port_name}")
-    
-    def _toggle_port_connection(self, tree, item):
-        """切换端口连接状态"""
-        current_state = tree.item(item)['values'][1]
-        new_state = "是" if current_state == "否" else "否"
-        port_name = tree.item(item)['values'][0]
-        tree.item(item, values=(port_name, new_state))
-    
-    def _on_port_double_click(self, tree, event):
-        """处理端口双击事件，切换连接状态"""
-        # 获取双击的项目
-        item = tree.identify_row(event.y)
-        if item:
-            # 切换连接状态
-            self._toggle_port_connection(tree, item)
     
     def _draw_module_schematic(self, canvas, module):
         """绘制模块电路示意图"""
@@ -576,7 +565,8 @@ class WGenGUI:
         canvas.create_rectangle(x1, y1, x2, y2, outline="black", width=2)
         
         # 绘制模块名称，使用VerilogModule对象的name属性
-        canvas.create_text((x1 + x2) // 2, y1 + 15, text=module.name, font=("Arial", 12, "bold"))
+        text_show = "\n"+module.name + "\n (" + module.module_def_name + ")"
+        canvas.create_text((x1 + x2) // 2, y1 + 15, text=text_show, font=("Arial", 12, "bold"))
         
         # 绘制输入端口，从VerilogPort对象获取名称
         if input_count > 0:

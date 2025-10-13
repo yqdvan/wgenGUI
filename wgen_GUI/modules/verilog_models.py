@@ -1,7 +1,7 @@
 class VerilogPort:
     """Verilog端口类，用于描述Verilog模块的端口信息"""
     
-    def __init__(self, name, direction, width=None, source=None, destination=None, father_module=None):
+    def __init__(self, name, direction, width=None, source=None, father_module=None):
         """
         初始化Verilog端口
         
@@ -10,11 +10,10 @@ class VerilogPort:
             direction (str): 端口方向，可选值: 'input', 'output', 'inout'
             width (dict): 端口位宽，格式为 {'high': int, 'low': int}，默认为1位宽
             source (VerilogPort or None): 输入信号的源头端口实例，默认为None
-            destination (VerilogPort or None): 输出信号的目的地端口实例，默认为None
         """
         self.name = name
         self.direction = direction.lower()  # 转换为小写以确保一致性
-        self.father_module = father_module
+        self.father_module:VerilogModule = father_module
         
         # 设置默认位宽为1位
         if width is None:
@@ -23,27 +22,32 @@ class VerilogPort:
             self.width = width
         
         self.source = source
-        self.destination = destination
+        self.destinations: list[VerilogPort] = []  # 存储多个目标端口
     
     def __str__(self):
         """返回端口的字符串表示"""
         # 构建位宽字符串
         if self.width['high'] == self.width['low']:
-            width_str = ''
+            width_str = '[0:0]'
         else:
             width_str = f"[{self.width['high']}:{self.width['low']}]"
         
         # 构建源和目的地信息
-        conn_info = ''
+        source_info = ''
         if self.direction in ['input', 'inout'] and self.source:
-            source_module = self.source.__module__ if hasattr(self.source, '__module__') else ''
-            conn_info += f" (source: {source_module}.{self.source.name if self.source else 'None'})"
-        if self.direction in ['output', 'inout'] and self.destination:
-            dest_module = self.destination.__module__ if hasattr(self.destination, '__module__') else ''
-            conn_info += f" (dest: {dest_module}.{self.destination.name if self.destination else 'None'})"
+            source_module = self.source.father_module if self.source.father_module is None else self.source.father_module
+            source_info += f" (source: {source_module.name}.{self.source.name if self.source else 'None'})"
         
-        return f"{self.direction} {self.name}{width_str}{conn_info}"
-    
+        dest_info = ''
+        if self.direction in ['output', 'inout'] and self.destinations:
+            dest_info += "port loads:\n"
+            for dest_port in self.destinations:
+                dest_module = dest_port.father_module if dest_port.father_module is None else dest_port.father_module
+                dest_info += f"    {dest_module.name}.{dest_port.name}\n"
+
+        return f"father md: {self.father_module.name}\nport type: {self.direction}\nport name: {self.name}{width_str}\n{source_info}\n{dest_info}"
+
+  
     def is_input(self):
         """判断是否为输入端口"""
         return self.direction == 'input'
@@ -69,16 +73,18 @@ class VerilogPort:
 class VerilogModule:
     """Verilog模块类，用于描述Verilog模块的信息"""
     
-    def __init__(self, name, file_path=''):
+    def __init__(self, name, file_path='', module_def_name=''):
         """
         初始化Verilog模块
         
         参数:
             name (str): 模块名称
-            file_path (str): 模块所在文件路径，默认为空
+            file_path (str): 模块所在文件路径，默认为空字符串
+            module_def_name (str): 模块定义名称，默认为空字符串
         """
         self.name = name
         self.file_path = file_path
+        self.module_def_name = module_def_name
         self.ports = []  # 存储端口列表
     
     def add_port(self, port):
@@ -171,17 +177,22 @@ class VerilogModule:
         
         # 输出端口连接信息
         for port in self.get_output_ports():
-            if port.destination:
-                # 获取目标端口所在模块信息
-                dest_module_name = port.destination.father_module.name if port.destination.father_module else 'unknown_module'
-                result += f"  Output {port.name} -> {dest_module_name}.{port.destination.name}\n"
+            if port.destinations:
+                # 获取所有目标端口所在模块信息
+                for dest_port in port.destinations:
+                    dest_module_name = dest_port.father_module.name if dest_port.father_module else 'unknown_module'
+                    result += f"  Output {port.name} -> {dest_module_name}.{dest_port.name}\n"
             else:
                 result += f"  Output {port.name} (unconnected)\n"
         
         # 双向端口连接信息
         for port in self.get_inout_ports():
             source_info = f"source: {port.source.__module_name}.{port.source.name}" if port.source else "no source"
-            dest_info = f"dest: {port.destination.__module_name}.{port.destination.name}" if port.destination else "no dest"
+            if port.destinations:
+                dest_info_list = [f"{dest_port.__module_name}.{dest_port.name}" for dest_port in port.destinations]
+                dest_info = f"dests: {', '.join(dest_info_list)}"
+            else:
+                dest_info = "no dest"
             result += f"  Inout {port.name} ({source_info}, {dest_info})\n"
         
         return result
@@ -415,7 +426,9 @@ class VerilogModuleCollection:
         # 更新端口的源和目的地信息
         # 源端口是输出端口或双向端口
         if source_port.is_output() or source_port.is_inout():
-            source_port.destination = dest_port
+            # 将目标端口添加到源端口的destinations列表中
+            if dest_port not in source_port.destinations:
+                source_port.destinations.append(dest_port)
         
         # 目标端口是输入端口或双向端口
         if dest_port.is_input() or dest_port.is_inout():
@@ -452,8 +465,8 @@ class VerilogModuleCollection:
         dest_port = connection_to_remove.dest_port
         
         # 移除源端口的目的地引用
-        if source_port.destination == dest_port:
-            source_port.destination = None
+        if dest_port in source_port.destinations:
+            source_port.destinations.remove(dest_port)
         
         # 移除目标端口的源引用
         if dest_port.source == source_port:
@@ -501,14 +514,14 @@ class VerilogModuleCollection:
             if output_ports:
                 result += "  Outputs:\n"
                 for port in output_ports:
-                    result += f"    {port.name}{' (connected)' if port.destination else ' (unconnected)'}\n"
+                    result += f"    {port.name}{' (connected)' if port.destinations else ' (unconnected)'}\n"
             
             # 双向端口
             inout_ports = module.get_inout_ports()
             if inout_ports:
                 result += "  Inouts:\n"
                 for port in inout_ports:
-                    connected = port.source or port.destination
+                    connected = port.source or port.destinations
                     result += f"    {port.name}{' (connected)' if connected else ' (unconnected)'}\n"
         
         # 打印连接信息
@@ -531,6 +544,7 @@ class VerilogModuleCollection:
             module_info = {
                 'name': module.name,
                 'file_path': module.file_path,
+                'module_def_name': module.module_def_name,
                 'ports': []
             }
             
@@ -589,7 +603,11 @@ class VerilogModuleCollection:
         # 首先重建所有模块
         module_map = {}
         for module_info in data_dict.get('modules', []):
-            module = VerilogModule(module_info['name'], module_info.get('file_path', ''))
+            module = VerilogModule(
+                name=module_info['name'],
+                file_path=module_info.get('file_path', ''),
+                module_def_name=module_info.get('module_def_name', '')
+            )
             
             # 重建模块的所有端口
             for port_info in module_info.get('ports', []):

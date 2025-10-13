@@ -11,9 +11,12 @@
 # complex_module: ./examples/complex_module.v
 
 modules:
-  - name: simple_module
+  - module_name: simple_module
+    ins_name: u_simple
     path: ./examples/simple_module.v
-  - name: param_module
+  - module_name: param_module
+    ins_name: u_param_module
     path: ./examples/param_module.v
-  - name: complex_module
+  - module_name: complex_module
+    ins_name: u_complex
     path: ./examples/complex_module.v

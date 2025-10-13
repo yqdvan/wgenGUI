@@ -60,11 +60,13 @@ class VerilogParser:
                     for module_info in config_data['modules']:
                         # 对于每个模块，解析其端口信息
                         module_data = self.parse_file(module_info['path'])
-                        module_name = module_info.get('name', module_data['module_name'])
+                        ins_name = module_info.get('ins_name', module_data['module_name'])
+                        module_def_name = module_info.get('module_def_name', module_data['module_name'])
+
                         file_path = module_info['path']
                         
                         # 直接创建VerilogModule对象
-                        module_obj = VerilogModule(name=module_name, file_path=file_path)
+                        module_obj = VerilogModule(name=ins_name, file_path=file_path, module_def_name=module_def_name)
                         
                         # 添加输入端口
                         for port_name in module_data['inputs']:
@@ -81,22 +83,22 @@ class VerilogParser:
         
         return modules
         
-    def _convert_to_verilog_model(self, modules):
-        """将解析后的模块信息转换为VerilogModule对象"""
-        modules_obj = []
-        for module in modules:
-            module_obj = VerilogModule(
-                name=module['name'],
-                file_path=module['file_path']
-            )
-            for port in module['inputs']:
-                module_obj.add_port(VerilogPort(name=port, direction="input"))
-            for port in module['outputs']:
-                module_obj.add_port(VerilogPort(name=port, direction="output"))
+    # def _convert_to_verilog_model(self, modules):
+    #     """将解析后的模块信息转换为VerilogModule对象"""
+    #     modules_obj = []
+    #     for module in modules:
+    #         module_obj = VerilogModule(
+    #             name=module['name'],
+    #             file_path=module['file_path']
+    #         )
+    #         for port in module['inputs']:
+    #             module_obj.add_port(VerilogPort(name=port, direction="input"))
+    #         for port in module['outputs']:
+    #             module_obj.add_port(VerilogPort(name=port, direction="output"))
         
-            modules_obj.append(module_obj)
+    #         modules_obj.append(module_obj)
             
-        return modules_obj
+    #     return modules_obj
 
 
 class VerilogPortParser:
