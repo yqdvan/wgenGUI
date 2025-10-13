@@ -2,10 +2,18 @@
 # 使用YAML语法指定Verilog模块名与文件路径的映射
 
 # 示例1：简单模块
-simple_module: ./examples/simple_module.v
+# simple_module: ./examples/simple_module.v
 
 # 示例2：带参数的模块
-param_module: ./examples/param_module.v
+# param_module: ./examples/param_module.v
 
 # 示例3：复杂模块
-complex_module: ./examples/complex_module.v
+# complex_module: ./examples/complex_module.v
+
+modules:
+  - name: simple_module
+    path: ./examples/simple_module.v
+  - name: param_module
+    path: ./examples/param_module.v
+  - name: complex_module
+    path: ./examples/complex_module.v

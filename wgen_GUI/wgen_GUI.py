@@ -1,8 +1,11 @@
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox, simpledialog
 import os
-import yaml
+import copy
+import datetime
+from collections import deque
 from modules.verilog_parser import VerilogParser
+from modules.verilog_models import VerilogModuleCollection
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
@@ -21,6 +24,11 @@ class WGenGUI:
         self.master_module = None
         self.slave_module = None
         
+        # 创建模块集合database
+        self.collection_DB = None
+        # 初始化一个大小为1024的栈，用于存放collection_DB的历史副本
+        self.connections_DB_stack = deque(maxlen=1024)
+
         # 存储缩放相关的属性
         self.master_scale = 1.0  # Master电路图的缩放比例
         self.slave_scale = 1.0   # Slave电路图的缩放比例
@@ -39,7 +47,8 @@ class WGenGUI:
         self._create_layout()
         
         # 启动时打开配置文件对话框
-        self._open_config_file()
+        # self._open_config_file()
+        self._open_database()
     
     def _create_layout(self):
         """创建GUI布局
@@ -226,6 +235,8 @@ class WGenGUI:
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="打开配置文件", command=self._open_config_file)
         file_menu.add_separator()
+        file_menu.add_command(label="打开数据库", command=self._open_database)
+        file_menu.add_separator()
         file_menu.add_command(label="退出", command=self.root.quit)
         
         # 添加文件按钮
@@ -251,6 +262,20 @@ class WGenGUI:
         
         # 弹出messagebox显示信息
         messagebox.showinfo("连接信息", f"Master输出端口选中：{master_port}\nSlave输入端口选中：{slave_port}")
+
+        from_port_obj = self.master_module.get_port(master_port)
+        to_port_obj = self.slave_module.get_port(slave_port)
+        
+        if from_port_obj and to_port_obj:
+            try:
+                self.collection_DB.connect_port(from_port_obj, to_port_obj)
+                save_result = self.save_database()
+                messagebox.showinfo("成功", f"已成功连接 {self.master_module.name}.{master_port} -> {self.slave_module.name}.{slave_port} \n{save_result}")
+                 
+            except Exception as e:
+                messagebox.showerror("错误", f"连接端口失败: {str(e)}")
+        else:
+            messagebox.showerror("错误", "请先选择有效的端口")
     
     def _open_config_file(self):
         """打开配置文件对话框"""
@@ -262,51 +287,107 @@ class WGenGUI:
         if file_path:
             self._load_config_file(file_path)
     
+    def _open_database(self):
+        """打开数据库对话框"""
+        file_path = filedialog.askopenfilename(
+            title="打开数据库",
+            filetypes=[("JSON文件", "*.json"), ("所有文件", "*.*")]
+        )
+        
+        if file_path:
+            self._load_database(file_path)
+
+            # 直接使用VerilogModule对象，不再转换为结构体
+            self.modules = self.collection_DB.modules
+
+            # 更新模块列表
+            self._update_modules_list()
+
+            
+    def _load_database(self, file_path):
+        """加载数据库文件并恢复collection_DB
+        
+        参数:
+            file_path (str): 数据库文件的路径
+        """
+        try:
+            # 从文件加载模块集合
+            loaded_collection = VerilogModuleCollection.load_from_file(file_path)
+            
+            if loaded_collection:
+                # 更新collection_DB
+                self.collection_DB = loaded_collection
+                
+                # 显示加载成功信息
+                messagebox.showinfo("成功", f"已成功加载数据库文件: {file_path}")
+            else:
+                messagebox.showerror("错误", "数据库文件加载失败，文件格式可能不正确")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"加载数据库失败: {str(e)}")
+
+
     def _load_config_file(self, file_path):
         """加载配置文件并更新界面"""
         try:
             # 解析配置文件
             self.modules = self.parser.parse_config_file(file_path)
-            
-            # 如果解析结果为空，尝试直接读取txt文件的简单格式
-            if not self.modules:
-                self.modules = self._parse_simple_config(file_path)
-            
+
             # 更新模块列表
             self._update_modules_list()
             
             # 显示加载成功信息
             messagebox.showinfo("成功", f"已成功加载{len(self.modules)}个模块")
+            self._initialize_collection_DB()
+            
         except Exception as e:
             messagebox.showerror("错误", f"加载配置文件失败: {str(e)}")
-    
-    def _parse_simple_config(self, file_path):
-        """解析简单格式的配置文件"""
-        modules = []
+
+    def _initialize_collection_DB(self):
+        """初始化模块集合数据库"""
+        self.collection_DB = VerilogModuleCollection()
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-                
-                for line in lines:
-                    line = line.strip()
-                    if line and not line.startswith('#'):
-                        # 假设格式为: module_name: file_path
-                        parts = line.split(':', 1)
-                        if len(parts) == 2:
-                            module_name = parts[0].strip()
-                            file_path = parts[1].strip()
-                            
-                            # 解析模块信息
-                            module_data = self.parser.parse_file(file_path)
-                            module_data.update({
-                                'file_path': file_path,
-                                'name': module_name
-                            })
-                            modules.append(module_data)
+            # 直接使用self.modules中的VerilogModule对象
+            for module in self.modules:
+                self.collection_DB.add_module(module)
+            self.collection_DB.get_hierarchy_summary()
         except Exception as e:
-            print(f"解析简单配置文件失败: {e}")
-        
-        return modules
+            messagebox.showerror("错误", f"初始化模块集合数据库失败: {str(e)}")
+            
+    def save_database(self) -> str:
+        """深拷贝collection_DB并保存为时间戳命名的json文件到sessions目录"""
+        return_str = "save Failed"
+        if not self.collection_DB:
+            messagebox.showerror("错误", "没有可保存的数据库")
+            return return_str
+            
+        try:
+            # 深拷贝collection_DB
+            db_copy = copy.deepcopy(self.collection_DB)
+            
+            # 创建sessions目录（如果不存在）
+            sessions_dir = os.path.join(os.path.dirname(__file__), "sessions")
+            if not os.path.exists(sessions_dir):
+                os.makedirs(sessions_dir)
+                
+            # 生成包含时间戳的文件名（具体到秒）
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_path = os.path.join(sessions_dir, f"collection_{timestamp}.json")
+            
+            # 调用副本的save_to_file方法保存
+            save_success = db_copy.save_to_file(file_path)
+            
+            if save_success:
+                success_message = f"数据库已成功保存到:\n{file_path}"
+                self.connections_DB_stack.append(db_copy)
+                return success_message
+            else:
+                messagebox.showerror("错误", "保存数据库失败")
+                return return_str
+        except Exception as e:
+            messagebox.showerror("错误", f"保存数据库时发生错误: {str(e)}")
+            return return_str
+
     
     def _update_modules_list(self):
         """更新模块列表显示"""
@@ -316,8 +397,8 @@ class WGenGUI:
         
         # 添加新模块
         for module in self.modules:
-            # 存储模块索引，方便后续操作
-            self.modules_tree.insert('', tk.END, text=module['name'], values=(module['name'],))
+            # 存储模块名称，使用VerilogModule对象的name属性
+            self.modules_tree.insert('', tk.END, text=module.name, values=(module.name,))
     
     def _show_module_context_menu(self, event):
         """显示模块右键菜单"""
@@ -338,7 +419,7 @@ class WGenGUI:
             
             # 查找对应的模块
             for module in self.modules:
-                if module['name'] == module_name:
+                if module.name == module_name:
                     self.master_module = module
                     break
             
@@ -353,7 +434,7 @@ class WGenGUI:
             
             # 查找对应的模块
             for module in self.modules:
-                if module['name'] == module_name:
+                if module.name == module_name:
                     self.slave_module = module
                     break
             
@@ -369,8 +450,9 @@ class WGenGUI:
                 self.master_ports_tree.delete(item)
             
             # 添加端口信息，默认连接状态为否
-            for port in self.master_module['outputs']:
-                self.master_ports_tree.insert('', tk.END, values=(port, "否"))
+            # 使用VerilogModule对象的方法获取端口，并从VerilogPort对象获取名称
+            for port in self.master_module.get_output_ports():
+                self.master_ports_tree.insert('', tk.END, values=(port.name, "否"))
             
             # 更新电路示意图
             self._draw_module_schematic(self.master_canvas, self.master_module)
@@ -384,8 +466,9 @@ class WGenGUI:
                 self.slave_ports_tree.delete(item)
             
             # 添加端口信息，默认连接状态为否
-            for port in self.slave_module['inputs']:
-                self.slave_ports_tree.insert('', tk.END, values=(port, "否"))
+            # 使用VerilogModule对象的方法获取端口，并从VerilogPort对象获取名称
+            for port in self.slave_module.get_input_ports():
+                self.slave_ports_tree.insert('', tk.END, values=(port.name, "否"))
             
             # 更新电路示意图
             self._draw_module_schematic(self.slave_canvas, self.slave_module)
@@ -467,9 +550,13 @@ class WGenGUI:
         base_width = min(width - 40, 200) * scale
         base_height = 100  # 基础高度
         
+        # 使用VerilogModule对象的方法获取端口
+        input_ports = module.get_input_ports()
+        output_ports = module.get_output_ports()
+        
         # 根据端口数量调整矩形高度，确保每个端口至少有20像素的空间
-        input_count = len(module['inputs'])
-        output_count = len(module['outputs'])
+        input_count = len(input_ports)
+        output_count = len(output_ports)
         max_port_count = max(input_count, output_count)
         port_based_height = 40 + max_port_count * 20  # 40是边距，每个端口20像素
         
@@ -488,28 +575,28 @@ class WGenGUI:
         # 绘制模块矩形
         canvas.create_rectangle(x1, y1, x2, y2, outline="black", width=2)
         
-        # 绘制模块名称
-        canvas.create_text((x1 + x2) // 2, y1 + 15, text=module['name'], font=("Arial", 12, "bold"))
+        # 绘制模块名称，使用VerilogModule对象的name属性
+        canvas.create_text((x1 + x2) // 2, y1 + 15, text=module.name, font=("Arial", 12, "bold"))
         
-        # 绘制输入端口
+        # 绘制输入端口，从VerilogPort对象获取名称
         if input_count > 0:
             port_spacing = (rect_height - 40) / (max(1, input_count - 1)) if input_count > 1 else 0
-            for i, port in enumerate(module['inputs']):
+            for i, port in enumerate(input_ports):
                 y_pos = y1 + 30 + port_spacing * i
                 # 绘制端口线
                 canvas.create_line(x1 - 20, y_pos, x1, y_pos, width=2)
-                # 绘制端口名称
-                canvas.create_text(x1 - 25, y_pos, text=port, anchor="e", font=("Arial", 10))
+                # 绘制端口名称，使用VerilogPort对象的name属性
+                canvas.create_text(x1 - 25, y_pos, text=port.name, anchor="e", font=("Arial", 10))
         
-        # 绘制输出端口
+        # 绘制输出端口，从VerilogPort对象获取名称
         if output_count > 0:
             port_spacing = (rect_height - 40) / (max(1, output_count - 1)) if output_count > 1 else 0
-            for i, port in enumerate(module['outputs']):
+            for i, port in enumerate(output_ports):
                 y_pos = y1 + 30 + port_spacing * i
                 # 绘制端口线
                 canvas.create_line(x2, y_pos, x2 + 20, y_pos, width=2)
-                # 绘制端口名称
-                canvas.create_text(x2 + 25, y_pos, text=port, anchor="w", font=("Arial", 10))
+                # 绘制端口名称，使用VerilogPort对象的name属性
+                canvas.create_text(x2 + 25, y_pos, text=port.name, anchor="w", font=("Arial", 10))
                 
     def _on_drag_start(self, event, canvas_type):
         """开始拖动画布"""

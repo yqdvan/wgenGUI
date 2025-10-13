@@ -14,6 +14,7 @@ class VerilogPort:
         """
         self.name = name
         self.direction = direction.lower()  # 转换为小写以确保一致性
+        self.father_module = father_module
         
         # 设置默认位宽为1位
         if width is None:
@@ -334,6 +335,41 @@ class VerilogModuleCollection:
                 return module
         return None
     
+    def connect_port(self, from_port:VerilogPort, to_port: VerilogPort, 
+                     source_bit_range=None, dest_bit_range=None):
+        """
+        连接两个端口
+        
+        参数:
+            from_port (VerilogPort): 源端口
+            to_port (VerilogPort): 目标端口
+            source_bit_range : 源端口使用的位范围 width={'high': 7, 'low': 0})
+            dest_bit_range : 目标端口使用的位范围 width={'high': 7, 'low': 0})
+        """
+        # 如果bit_range为空，使用端口的width
+        if source_bit_range is None:
+            source_bit_range = from_port.width
+        if dest_bit_range is None:
+            dest_bit_range = to_port.width
+        
+        # 检查源端口和目标端口的bit_range的high-low值是否相等
+        source_bit_width = source_bit_range['high'] - source_bit_range['low']
+        dest_bit_width = dest_bit_range['high'] - dest_bit_range['low']
+        
+        if source_bit_width != dest_bit_width:
+            raise ValueError(f"源端口位宽 ({source_bit_width + 1}) 与目标端口位宽 ({dest_bit_width + 1}) 不匹配")
+        
+        # 获取端口和模块信息
+        source_port_name = from_port.name
+        dest_port_name = to_port.name
+        source_module_name = from_port.father_module.name
+        dest_module_name = to_port.father_module.name   
+
+        # 执行连接
+        self.add_connection(source_module_name, source_port_name, dest_module_name, dest_port_name,
+                            source_bit_range, dest_bit_range)
+
+
     def add_connection(self, source_module_name, source_port_name, dest_module_name, dest_port_name, 
                        source_bit_range=None, dest_bit_range=None):
         """
