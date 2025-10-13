@@ -482,3 +482,166 @@ class VerilogModuleCollection:
                 result += f"  {conn}\n"
         
         return result
+        
+    def to_dict(self):
+        """将模块集合转换为可序列化的字典
+        
+        返回:
+            dict: 包含所有模块和连接信息的字典
+        """
+        # 首先序列化所有模块
+        modules_dict = []
+        for module in self.modules:
+            module_info = {
+                'name': module.name,
+                'file_path': module.file_path,
+                'ports': []
+            }
+            
+            # 序列化模块的所有端口
+            for port in module.ports:
+                port_info = {
+                    'name': port.name,
+                    'direction': port.direction,
+                    'width': port.width
+                }
+                module_info['ports'].append(port_info)
+            
+            modules_dict.append(module_info)
+        
+        # 然后序列化所有连接
+        connections_dict = []
+        for conn in self.connections:
+            conn_info = {
+                'source_module_name': conn.source_module_name,
+                'source_port_name': conn.source_port.name,
+                'dest_module_name': conn.dest_module_name,
+                'dest_port_name': conn.dest_port.name,
+                'source_bit_range': conn.source_bit_range,
+                'dest_bit_range': conn.dest_bit_range
+            }
+            connections_dict.append(conn_info)
+        
+        # 返回完整的字典表示
+        return {
+            'modules': modules_dict,
+            'connections': connections_dict
+        }
+    
+    def to_json(self):
+        """将模块集合直接转换为JSON字符串
+        
+        返回:
+            str: 包含所有模块和连接信息的JSON字符串
+        """
+        import json
+        return json.dumps(self.to_dict(), indent=2)
+    
+    @classmethod
+    def from_dict(cls, data_dict):
+        """从字典中创建VerilogModuleCollection对象
+        
+        参数:
+            data_dict (dict): 包含模块和连接信息的字典
+            
+        返回:
+            VerilogModuleCollection: 重建的模块集合对象
+        """
+        # 创建空的模块集合
+        collection = cls()
+        
+        # 首先重建所有模块
+        module_map = {}
+        for module_info in data_dict.get('modules', []):
+            module = VerilogModule(module_info['name'], module_info.get('file_path', ''))
+            
+            # 重建模块的所有端口
+            for port_info in module_info.get('ports', []):
+                port = VerilogPort(
+                    name=port_info['name'],
+                    direction=port_info['direction'],
+                    width=port_info.get('width', {'high': 0, 'low': 0})
+                )
+                module.add_port(port)
+            
+            collection.add_module(module)
+            module_map[module.name] = module
+        
+        # 然后重建所有连接
+        for conn_info in data_dict.get('connections', []):
+            try:
+                # 使用现有的add_connection方法来确保所有验证和引用都正确设置
+                collection.add_connection(
+                    source_module_name=conn_info['source_module_name'],
+                    source_port_name=conn_info['source_port_name'],
+                    dest_module_name=conn_info['dest_module_name'],
+                    dest_port_name=conn_info['dest_port_name'],
+                    source_bit_range=conn_info.get('source_bit_range'),
+                    dest_bit_range=conn_info.get('dest_bit_range')
+                )
+            except Exception as e:
+                # 如果连接创建失败，打印错误信息但继续处理其他连接
+                print(f"警告: 无法创建连接 {conn_info['source_module_name']}.{conn_info['source_port_name']} -> {conn_info['dest_module_name']}.{conn_info['dest_port_name']}: {e}")
+        
+        return collection
+    
+    @classmethod
+    def from_json(cls, json_str):
+        """从JSON字符串中创建VerilogModuleCollection对象
+        
+        参数:
+            json_str (str): 包含模块和连接信息的JSON字符串
+            
+        返回:
+            VerilogModuleCollection: 重建的模块集合对象
+        """
+        import json
+        data_dict = json.loads(json_str)
+        return cls.from_dict(data_dict)
+    
+    def save_to_file(self, file_path):
+        """将模块集合保存到文件
+        
+        参数:
+            file_path (str): 保存文件的路径
+            
+        返回:
+            bool: 保存是否成功
+        """
+        try:
+            import json
+            
+            # 获取模块集合的字典表示
+            collection_dict = self.to_dict()
+            
+            # 将字典保存到文件
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(collection_dict, f, indent=2, ensure_ascii=False)
+            
+            return True
+        except Exception as e:
+            print(f"错误: 无法保存模块集合到文件 {file_path}: {e}")
+            return False
+    
+    @classmethod
+    def load_from_file(cls, file_path):
+        """从文件加载模块集合
+        
+        参数:
+            file_path (str): 加载文件的路径
+            
+        返回:
+            VerilogModuleCollection or None: 重建的模块集合对象，如果加载失败则返回None
+        """
+        try:
+            import json
+            
+            # 从文件读取字典
+            with open(file_path, 'r', encoding='utf-8') as f:
+                collection_dict = json.load(f)
+            
+            # 从字典创建模块集合
+            return cls.from_dict(collection_dict)
+        except Exception as e:
+            print(f"错误: 无法从文件 {file_path} 加载模块集合: {e}")
+            return None

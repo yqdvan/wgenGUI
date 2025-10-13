@@ -79,6 +79,9 @@ class WGenGUI:
         self.right_frame = ttk.Frame(self.main_paned)
         self.main_paned.add(self.right_frame, weight=4)
         
+        # 确保窗口已经初始化
+        self.root.update_idletasks() 
+        
     def _create_left_panel(self):
         """创建左侧面板内容
         

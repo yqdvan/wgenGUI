@@ -248,3 +248,131 @@ print(f"receiver2_module.clk的source引用: {receiver2_port.source}")
 
 # 打印分发模块的连接摘要
 print(distributor_module.get_connections_summary())
+
+# 示例10: 测试模块集合的序列化和反序列化功能
+print("\n===== 示例10: 测试模块集合的序列化和反序列化功能 =====")
+
+# 创建一个用于测试序列化的模块集合
+serialization_test_collection = VerilogModuleCollection()
+
+# 创建几个模块用于测试
+test_module1 = VerilogModule(name="test_module1")
+test_module1.add_port(VerilogPort(name="clk", direction="output"))
+test_module1.add_port(VerilogPort(name="data_out", direction="output", width={'high': 7, 'low': 0}))
+
+test_module2 = VerilogModule(name="test_module2")
+test_module2.add_port(VerilogPort(name="clk", direction="input"))
+test_module2.add_port(VerilogPort(name="data_in", direction="input", width={'high': 7, 'low': 0}))
+test_module2.add_port(VerilogPort(name="result", direction="output", width={'high': 7, 'low': 0}))
+
+# 添加模块到集合
+serialization_test_collection.add_module(test_module1)
+serialization_test_collection.add_module(test_module2)
+
+# 建立连接
+serialization_test_collection.add_connection(
+    source_module_name="test_module1",
+    source_port_name="clk",
+    dest_module_name="test_module2",
+    dest_port_name="clk"
+)
+serialization_test_collection.add_connection(
+    source_module_name="test_module1",
+    source_port_name="data_out",
+    dest_module_name="test_module2",
+    dest_port_name="data_in"
+)
+
+print("原始模块集合的层次结构摘要:")
+print(serialization_test_collection.get_hierarchy_summary())
+
+# 测试1: 使用to_dict()和from_dict()
+print("\n测试1: 使用to_dict()和from_dict()")
+collection_dict = serialization_test_collection.to_dict()
+print(f"序列化到字典成功, 包含{len(collection_dict['modules'])}个模块和{len(collection_dict['connections'])}个连接")
+
+# 从字典反序列化
+restored_collection = VerilogModuleCollection.from_dict(collection_dict)
+print("从字典反序列化成功!")
+print("反序列化后的模块集合层次结构摘要:")
+print(restored_collection.get_hierarchy_summary())
+
+# 测试2: 使用to_json()和from_json()
+print("\n测试2: 使用to_json()和from_json()")
+collection_json = serialization_test_collection.to_json()
+print(f"序列化到JSON字符串成功, 字符串长度: {len(collection_json)}字符")
+
+# 从JSON字符串反序列化
+json_restored_collection = VerilogModuleCollection.from_json(collection_json)
+print("从JSON字符串反序列化成功!")
+print("反序列化后的模块集合层次结构摘要:")
+print(json_restored_collection.get_hierarchy_summary())
+
+# 测试3: 验证反序列化后的对象功能是否正常
+print("\n测试3: 验证反序列化后的对象功能是否正常")
+
+# 检查模块数量是否正确
+print(f"原始集合模块数: {len(serialization_test_collection.modules)}")
+print(f"反序列化集合模块数: {len(restored_collection.modules)}")
+
+# 检查连接数量是否正确
+print(f"原始集合连接数: {len(serialization_test_collection.connections)}")
+print(f"反序列化集合连接数: {len(restored_collection.connections)}")
+
+# 检查模块间连接是否正确建立
+restored_module1 = restored_collection.get_module("test_module1")
+restored_module2 = restored_collection.get_module("test_module2")
+
+if restored_module1 and restored_module2:
+    clk_port = restored_module2.get_port("clk")
+    data_in_port = restored_module2.get_port("data_in")
+    
+    print(f"restored_module2.clk的源端口: {clk_port.source.name if clk_port and clk_port.source else None}")
+    print(f"restored_module2.data_in的源端口: {data_in_port.source.name if data_in_port and data_in_port.source else None}")
+
+print("\n序列化和反序列化测试完成!")
+
+# 示例11: 测试模块集合的文件保存和加载功能
+print("\n===== 示例11: 测试模块集合的文件保存和加载功能 =====")
+
+# 定义测试文件路径
+test_file_path = "test_module_collection.json"
+
+# 测试保存到文件
+print(f"\n测试1: 将模块集合保存到文件 {test_file_path}")
+save_success = serialization_test_collection.save_to_file(test_file_path)
+if save_success:
+    print(f"成功将模块集合保存到文件 {test_file_path}!")
+    
+    # 测试从文件加载
+    print(f"\n测试2: 从文件 {test_file_path} 加载模块集合")
+    file_loaded_collection = VerilogModuleCollection.load_from_file(test_file_path)
+    
+    if file_loaded_collection:
+        print("成功从文件加载模块集合!")
+        print("加载后的模块集合层次结构摘要:")
+        print(file_loaded_collection.get_hierarchy_summary())
+        
+        # 验证加载的对象功能是否正常
+        print("\n测试3: 验证从文件加载的对象功能是否正常")
+        print(f"原始集合模块数: {len(serialization_test_collection.modules)}")
+        print(f"加载集合模块数: {len(file_loaded_collection.modules)}")
+        print(f"原始集合连接数: {len(serialization_test_collection.connections)}")
+        print(f"加载集合连接数: {len(file_loaded_collection.connections)}")
+        
+        # 检查模块间连接是否正确建立
+        loaded_module1 = file_loaded_collection.get_module("test_module1")
+        loaded_module2 = file_loaded_collection.get_module("test_module2")
+        
+        if loaded_module1 and loaded_module2:
+            clk_port = loaded_module2.get_port("clk")
+            data_in_port = loaded_module2.get_port("data_in")
+            
+            print(f"loaded_module2.clk的源端口: {clk_port.source.name if clk_port and clk_port.source else None}")
+            print(f"loaded_module2.data_in的源端口: {data_in_port.source.name if data_in_port and data_in_port.source else None}")
+    else:
+        print(f"无法从文件 {test_file_path} 加载模块集合!")
+else:
+    print(f"无法将模块集合保存到文件 {test_file_path}!")
+
+print("\n文件保存和加载测试完成!")
