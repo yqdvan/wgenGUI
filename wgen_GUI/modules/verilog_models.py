@@ -757,20 +757,35 @@ class VerilogModuleCollection:
         data_dict = json.loads(json_str)
         return cls.from_dict(data_dict)
     
-    def save_to_file(self, file_path):
+    def save_to_file(self, file_path, metadata=None):
         """将模块集合保存到文件
         
         参数:
             file_path (str): 保存文件的路径
+            metadata (dict): 可选的元数据信息
             
         返回:
             bool: 保存是否成功
         """
         try:
             import json
+            import os
+            import datetime
             
             # 获取模块集合的字典表示
             collection_dict = self.to_dict()
+            
+            # 添加元数据到集合字典中
+            if metadata is None:
+                metadata = {}
+            
+            # 确保元数据包含必要信息
+            metadata.setdefault('version', 'unknown')
+            metadata.setdefault('save_time', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            metadata.setdefault('user', os.getlogin() if hasattr(os, 'getlogin') else 'unknown')
+            
+            # 将元数据添加到集合字典中
+            collection_dict['metadata'] = metadata
             
             # 将字典保存到文件
             with open(file_path, 'w', encoding='utf-8') as f:

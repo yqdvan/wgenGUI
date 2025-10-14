@@ -81,13 +81,14 @@ class FileHandler:
         except Exception as e:
             raise Exception(f"加载数据库失败: {str(e)}")
             
-    def save_database(self, collection_DB, sessions_dir=None, connections_DB_stack=None):
+    def save_database(self, collection_DB, file_path=None, connections_DB_stack=None, version=None):
         """深拷贝collection_DB并保存为时间戳命名的json文件到sessions目录
         
         参数:
             collection_DB: 要保存的模块集合数据库
-            sessions_dir (str or None): sessions目录路径，为None时使用默认路径
+            file_path (str or None): 数据库文件路径，为None时使用默认路径
             connections_DB_stack (deque or None): 连接历史栈，用于保存历史记录
+            version (str): 可选的软件版本信息
             
         返回:
             str: 保存结果信息
@@ -102,14 +103,12 @@ class FileHandler:
             # 深拷贝collection_DB
             db_copy = copy.deepcopy(collection_DB)
             
-            # 使用提供的sessions_dir或计算默认路径
-            if sessions_dir is None:
-                # 获取当前文件的父目录
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                # 向上一级目录，然后进入sessions目录
-                sessions_dir = os.path.join(current_dir, "..", "sessions")
-                # 规范化路径
-                sessions_dir = os.path.normpath(sessions_dir)
+            # 获取当前文件的父目录
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # 向上一级目录，然后进入sessions目录
+            sessions_dir = os.path.join(current_dir, "..", "sessions")
+            # 规范化路径
+            sessions_dir = os.path.normpath(sessions_dir)
                 
             # 创建sessions目录（如果不存在）
             if not os.path.exists(sessions_dir):
@@ -117,10 +116,14 @@ class FileHandler:
                 
             # 生成包含时间戳的文件名（具体到秒）
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_path = os.path.join(sessions_dir, f"collection_{timestamp}.json")
+            if file_path is None:
+                file_path = os.path.join(sessions_dir, f"collection_{timestamp}.json")
             
-            # 调用副本的save_to_file方法保存
-            save_success = db_copy.save_to_file(file_path)
+            # 准备元数据
+            metadata = {'version': version} if version else {}
+            
+            # 调用副本的save_to_file方法保存，并传递元数据
+            save_success = db_copy.save_to_file(file_path, metadata)
             
             if save_success:
                 success_message = f"数据库已成功保存到:\n{file_path}"

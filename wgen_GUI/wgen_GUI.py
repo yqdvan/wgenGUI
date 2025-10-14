@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
+from tkinter import ttk, messagebox, simpledialog, filedialog
 import copy
 from collections import deque
 from modules.verilog_parser import VerilogParser
@@ -8,12 +8,13 @@ from modules.file_handler import FileHandler
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
-    
+    version = "0.1.0"
     def __init__(self, root):
         """初始化GUI界面"""
         self.root = root
-        self.root.title("wgen_GUI")
+        self.root.title(f"wgen_GUI {self.version}")
         self.root.geometry("1200x800")
+
         
         # 创建解析器实例
         self.parser = VerilogParser()
@@ -268,7 +269,7 @@ class WGenGUI:
         file_menu.add_command(label="打开配置文件", command=self._open_config_file)
         file_menu.add_separator()
         file_menu.add_command(label="打开Database", command=self._open_database)
-        file_menu.add_command(label="保存Database", command=self._save_database)
+        file_menu.add_command(label="保存Database", command=self._user_save_database)
         file_menu.add_separator()
         file_menu.add_command(label="退出", command=self.root.quit)
         
@@ -297,6 +298,9 @@ class WGenGUI:
         
         # 弹出messagebox显示信息
         # messagebox.showinfo("连接信息", f"Master输出端口选中：{master_port}\nSlave输入端口选中：{slave_port}")
+        if self.master_module is None or self.slave_module is None:
+            messagebox.showerror("错误", "请在模块列表鼠标右键指定Master与Slave, 并在端口列表选择端口！！")
+            return
 
         from_port_obj = self.master_module.get_port(master_port)
         to_port_obj = self.slave_module.get_port(slave_port)
@@ -311,7 +315,7 @@ class WGenGUI:
             except Exception as e:
                 messagebox.showerror("错误", f"连接端口失败: {str(e)}")
         else:
-            messagebox.showerror("错误", "请先选择有效的输出端口和输入端口！！")
+            messagebox.showerror("错误", "请先选择有效的“输出端口”和“输入端口”！！")
     
     def _open_config_file(self):
         """打开配置文件对话框"""
@@ -369,13 +373,48 @@ class WGenGUI:
             except Exception as e:
                 messagebox.showerror("错误", f"加载Database失败: {str(e)}")
             
-    def _save_database(self):
+    def _user_save_database(self):
+        """弹出文件窗口让用户指定保存位置和文件名，然后调用_save_database保存数据库"""
+        if self.collection_DB:
+            try:
+                # 使用filedialog让用户选择保存位置和文件名
+                file_path = filedialog.asksaveasfilename(
+                    title="保存Database",
+                    defaultextension=".json",
+                    filetypes=[("JSON文件", "*.json"), ("所有文件", "*.*")]
+                )
+                
+                # 如果用户选择了文件路径
+                if file_path:
+                    # 调用_save_database函数，传入用户选择的文件路径和软件版本
+                    save_result = self._save_database(file_path, self.version)  
+                    if save_result:
+                        messagebox.showinfo("保存成功", save_result)
+                        return save_result
+                else:
+                    # 用户取消了保存操作
+                    return "save Cancelled"
+            except Exception as e:
+                messagebox.showerror("错误", f"保存Database失败: {str(e)}")
+                return "save Failed"
+        else:
+            messagebox.showwarning("警告", "没有可保存的Database")
+            return "save Failed"
+    
+    def _save_database(self, file_path=None, version=None):
         """保存database到文件"""
         if self.collection_DB:
             try:
-                # 使用FileHandler保存数据库
-                save_result = self.file_handler.save_database(self.collection_DB, None, self.connections_DB_stack)
+                # 使用FileHandler保存数据库，并传递版本信息
+                # 如果没有传入版本，默认使用类的version属性
+                save_result = self.file_handler.save_database(
+                    self.collection_DB, 
+                    file_path, 
+                    self.connections_DB_stack,
+                    version or self.version
+                )
                 if save_result:
+                    # messagebox.showinfo("成功", save_result)
                     return save_result
             except Exception as e:
                 messagebox.showerror("错误", f"保存Database失败: {str(e)}")
@@ -837,8 +876,8 @@ class WGenGUI:
         
         弹出一个消息框，显示本软件的著作权、基本功能、版本等信息
         """
-        about_message = """
-WGenGUI 版本 1.0
+        about_message = f"""
+WGenGUI 版本 {self.version}
 
 著作权所有 © 2023
 
