@@ -1,6 +1,7 @@
 
 import re
 from .verilog_models import VerilogModule, VerilogPort
+from tkinter import messagebox
 
 class VerilogParser:
     """Verilog文件解析器，用于提取模块的输入输出端口信息"""
@@ -42,8 +43,8 @@ class VerilogParser:
         返回:
             list: 包含VerilogModule对象的列表
         """
-        from .verilog_models import VerilogModule, VerilogPort
-        modules = []
+
+        modules_ans: list[VerilogModule] = []
         try:
             import yaml
             with open(config_file_path, 'r', encoding='utf-8') as f:
@@ -56,6 +57,7 @@ class VerilogParser:
                 #   - name: module2
                 #     path: /path/to/module2.v
                 
+                # 解析原始的modules部分
                 if 'modules' in config_data:
                     for module_info in config_data['modules']:
                         # 对于每个模块，解析其端口信息
@@ -76,29 +78,70 @@ class VerilogParser:
                         for port_name in module_data['outputs']:
                             module_obj.add_port(VerilogPort(name=port_name, direction="output"))
                         
-                        modules.append(module_obj)
+                        # 添加到模块列表
+                        modules_ans.append(module_obj)
+                
+                # 解析generate_modules部分
+                if 'generate_modules' in config_data:
+
+                    # 标记需要生成的模块
+                    for gen_module_info in config_data['generate_modules']:
+                        module_name = gen_module_info['module_name']
+                        module_path = gen_module_info['path']
+                        
+                        #创建新的模块对象
+                        module_obj = VerilogModule(
+                            name=module_name,
+                            file_path=module_path,
+                            module_def_name=module_name
+                        )
+
+                        module_obj.need_gen = True 
+                        modules_ans.append(module_obj)
+
+                
+                # 解析hierarchy_def部分
+                if 'hierarchy_def' in config_data:
+
+                    for hierarchy_info in config_data['hierarchy_def']:
+                        parent_module_name = hierarchy_info['hierarchy']
+                        included_modules = hierarchy_info['includes']
+                        
+                        # edit module include relation
+                        parent_module = self.get_module_by_name(modules_ans, parent_module_name)
+                        if parent_module:
+                            for included_module_name in included_modules:
+                                included_module = self.get_module_by_name(modules_ans, included_module_name)
+                                if included_module:
+                                    parent_module.includes.append(included_module)
+                                    included_module.top_module = parent_module
+                                else:
+                                    messagebox.showwarning("警告", f"未找到包含模块(RTL verilog) {included_module_name}")
+                                    return None
+                        else:
+                            messagebox.showwarning("警告", f"未找到父模块(generate verilog) {parent_module_name}")
+                            return None
+
         except Exception as e:
             # 如果解析失败，返回空列表
-            print(f"解析配置文件失败: {e}")
+            messagebox.showerror("错误", f"解析yaml配置文件失败: {e}")
         
-        return modules
+        return modules_ans
         
-    # def _convert_to_verilog_model(self, modules):
-    #     """将解析后的模块信息转换为VerilogModule对象"""
-    #     modules_obj = []
-    #     for module in modules:
-    #         module_obj = VerilogModule(
-    #             name=module['name'],
-    #             file_path=module['file_path']
-    #         )
-    #         for port in module['inputs']:
-    #             module_obj.add_port(VerilogPort(name=port, direction="input"))
-    #         for port in module['outputs']:
-    #             module_obj.add_port(VerilogPort(name=port, direction="output"))
+    def get_module_by_name(self,module_list: list[VerilogModule], module_name: str):
+        """
+        根据模块名获取模块对象
         
-    #         modules_obj.append(module_obj)
+        参数:
+            module_name (str): 模块名
             
-    #     return modules_obj
+        返回:
+            VerilogModule: 对应的模块对象
+        """
+        for module in module_list:
+            if module.name == module_name:
+                return module
+        return None
 
 
 class VerilogPortParser:

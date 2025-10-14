@@ -48,9 +48,22 @@ class WGenGUI:
         # 创建主界面布局
         self._create_layout()
         
-        # 启动时打开配置文件对话框
-        # self._open_config_file()
-        self._open_database()
+        # 启动时打开选择对话框
+        self._show_startup_dialog()
+    
+    def _show_startup_dialog(self):
+        """显示启动选择对话框，使用tkinter内置的是/否按钮对话框"""
+        # 使用messagebox.askyesno显示是/否对话框
+        result = messagebox.askyesno(
+            title="启动选择",
+            message="是否继续上一次工作？\n\n“是”：选择您保存的database，“否”：打开配置文件初始化数据库"
+        )
+        
+        # 根据用户的选择执行相应操作
+        if result:  # 用户选择"是"
+            self._open_database()
+        else:  # 用户选择"否"或关闭对话框
+            self._open_config_file()
     
     def _create_layout(self):
         """创建GUI布局
@@ -109,8 +122,14 @@ class WGenGUI:
         hierarchy_frame = ttk.LabelFrame(left_paned, text="互联Hierarchy")
         left_paned.add(hierarchy_frame, weight=1)
         
-        self.hierarchy_text = tk.Text(hierarchy_frame, wrap=tk.WORD)
+        # 使用Text控件，以多行文本加缩进的方式展示层次关系
+        self.hierarchy_text = tk.Text(hierarchy_frame, wrap=tk.WORD, font=('Arial', 10))
         self.hierarchy_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # 创建滚动条
+        # hierarchy_scrollbar = ttk.Scrollbar(hierarchy_frame, orient=tk.VERTICAL, command=self.hierarchy_text.yview)
+        # hierarchy_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # self.hierarchy_text.configure(yscrollcommand=hierarchy_scrollbar.set)
         
         # 左侧下部分（模块列表）
         modules_frame = ttk.LabelFrame(left_paned, text="模块列表")
@@ -136,28 +155,29 @@ class WGenGUI:
         """创建右侧面板内容
         
         负责创建右侧面板的所有组件，包括：
-        1. 设置网格布局
-        2. Master输出端口列表
-        3. Slave输入端口列表
-        4. Master电路示意图画布
-        5. Slave电路示意图画布
-        6. 端口右键菜单
+        1. 使用左右PanedWindow布局，左侧为Master，右侧为Slave
+        2. 在Master和Slave内部各自使用上下PanedWindow
+        3. 上方放置端口列表，下方放置电路示意图
+        4. 所有区域大小均可调整
         """
-        # 右侧网格布局
-        self.right_frame.grid_rowconfigure(0, weight=1)
-        self.right_frame.grid_rowconfigure(1, weight=1)
-        self.right_frame.grid_columnconfigure(0, weight=1)
-        self.right_frame.grid_columnconfigure(1, weight=1)
+        # 右侧主PanedWindow - 左右布局
+        right_main_paned = ttk.PanedWindow(self.right_frame, orient=tk.HORIZONTAL)
+        right_main_paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 右上部分（Master输出端口）
-        master_ports_frame = ttk.LabelFrame(self.right_frame, text="Master输出端口")
-        master_ports_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        # Master部分 - 左侧
+        # 创建Master内部PanedWindow - 上下布局
+        master_paned = ttk.PanedWindow(right_main_paned, orient=tk.VERTICAL)
+        right_main_paned.add(master_paned, weight=1)
+        
+        # Master上方 - 输出端口列表
+        master_ports_frame = ttk.LabelFrame(master_paned, text="Master输出端口")
+        master_paned.add(master_ports_frame, weight=1)
         
         # 创建内部容器框架
         master_ports_inner_frame = ttk.Frame(master_ports_frame)
         master_ports_inner_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 使用Treeview替代Text控件显示端口列表
+        # 使用Treeview显示端口列表
         self.master_ports_tree = ttk.Treeview(master_ports_inner_frame, columns=("port","width", "connected"), show="headings")
         self.master_ports_tree.heading("port", text="端口名称")
         self.master_ports_tree.heading("width", text="Bit(s)")
@@ -176,16 +196,33 @@ class WGenGUI:
         self.master_ports_tree.bind("<Button-3>", self._show_port_context_menu)
         # 绑定双击事件，用于显示端口信息
         self.master_ports_tree.bind("<Double-1>", lambda event: self._on_port_double_click(self.master_ports_tree, event))
-
-        # 右下部分（Slave输入端口）
-        slave_ports_frame = ttk.LabelFrame(self.right_frame, text="Slave输入端口")
-        slave_ports_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        
+        # Master下方 - 电路示意图
+        master_schematic_frame = ttk.LabelFrame(master_paned, text="Master电路示意图")
+        master_paned.add(master_schematic_frame, weight=1)
+        
+        self.master_canvas = tk.Canvas(master_schematic_frame, bg="white")
+        self.master_canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # 绑定鼠标事件
+        self.master_canvas.bind("<Button-1>", lambda event: self._on_drag_start(event, "master"))
+        self.master_canvas.bind("<B1-Motion>", lambda event: self._on_drag_motion(event, "master"))
+        self.master_canvas.bind("<ButtonRelease-1>", self._on_drag_end)
+        self.master_canvas.bind("<MouseWheel>", lambda event: self._on_mousewheel(event, "master"))
+        
+        # Slave部分 - 右侧
+        # 创建Slave内部PanedWindow - 上下布局
+        slave_paned = ttk.PanedWindow(right_main_paned, orient=tk.VERTICAL)
+        right_main_paned.add(slave_paned, weight=1)
+        
+        # Slave上方 - 输入端口列表
+        slave_ports_frame = ttk.LabelFrame(slave_paned, text="Slave输入端口")
+        slave_paned.add(slave_ports_frame, weight=1)
         
         # 创建内部容器框架
         slave_ports_inner_frame = ttk.Frame(slave_ports_frame)
         slave_ports_inner_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 使用Treeview替代Text控件显示端口列表
+        # 使用Treeview显示端口列表
         self.slave_ports_tree = ttk.Treeview(slave_ports_inner_frame, columns=("port","width", "connected"), show="headings")
         self.slave_ports_tree.heading("port", text="端口名称")
         self.slave_ports_tree.heading("width", text="Bit(s)")
@@ -210,21 +247,9 @@ class WGenGUI:
         self.port_menu.add_command(label="断开连接", command=lambda: self._port_menu_action("optionA", self.current_tree))
         self.port_menu.add_command(label="optionB", command=lambda: self._port_menu_action("optionB", self.current_tree))
         
-        # 左下部分（Master电路示意图）
-        master_schematic_frame = ttk.LabelFrame(self.right_frame, text="Master电路示意图")
-        master_schematic_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        
-        self.master_canvas = tk.Canvas(master_schematic_frame, bg="white")
-        self.master_canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        # 绑定鼠标事件
-        self.master_canvas.bind("<Button-1>", lambda event: self._on_drag_start(event, "master"))
-        self.master_canvas.bind("<B1-Motion>", lambda event: self._on_drag_motion(event, "master"))
-        self.master_canvas.bind("<ButtonRelease-1>", self._on_drag_end)
-        self.master_canvas.bind("<MouseWheel>", lambda event: self._on_mousewheel(event, "master"))
-        
-        # 右下部分（Slave电路示意图）
-        slave_schematic_frame = ttk.LabelFrame(self.right_frame, text="Slave电路示意图")
-        slave_schematic_frame.grid(row=1, column=1, sticky="nsew", padx=5, pady=5)
+        # Slave下方 - 电路示意图
+        slave_schematic_frame = ttk.LabelFrame(slave_paned, text="Slave电路示意图")
+        slave_paned.add(slave_schematic_frame, weight=1)
         
         self.slave_canvas = tk.Canvas(slave_schematic_frame, bg="white")
         self.slave_canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -234,12 +259,14 @@ class WGenGUI:
         self.slave_canvas.bind("<ButtonRelease-1>", self._on_drag_end)
         self.slave_canvas.bind("<MouseWheel>", lambda event: self._on_mousewheel(event, "slave"))
     
+    
     def _create_menu(self):
         """创建菜单栏"""
         menu_bar = tk.Menu(self.root)
         
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="打开配置文件", command=self._open_config_file)
+        file_menu.add_separator()
         file_menu.add_command(label="打开Database", command=self._open_database)
         file_menu.add_command(label="保存Database", command=self._save_database)
         file_menu.add_separator()
@@ -279,11 +306,12 @@ class WGenGUI:
                 self.collection_DB.connect_port(from_port_obj, to_port_obj)
                 save_result = self._save_database()
                 messagebox.showinfo("成功", f"已成功连接 {self.master_module.name}.{master_port} -> {self.slave_module.name}.{slave_port} \n{save_result}")
-                  
+                self._update_master_display()
+                self._update_slave_display()
             except Exception as e:
                 messagebox.showerror("错误", f"连接端口失败: {str(e)}")
         else:
-            messagebox.showerror("错误", "请先选择有效的端口")
+            messagebox.showerror("错误", "请先选择有效的输出端口和输入端口！！")
     
     def _open_config_file(self):
         """打开配置文件对话框"""
@@ -298,6 +326,7 @@ class WGenGUI:
             if modules:
                 self.modules = modules
                 self._update_modules_list()
+                self._update_hierarchy_view()
                 messagebox.showinfo("成功", f"配置文件已加载，共包含 {len(modules)} 个模块")
                 self._initialize_collection_DB()
         except Exception as e:
@@ -320,7 +349,8 @@ class WGenGUI:
             self.master_ports_tree.delete(item)
         for item in self.slave_ports_tree.get_children():
             self.slave_ports_tree.delete(item)
-            
+        self._update_hierarchy_view()
+        
         file_path = self.file_handler.open_database_dialog()
         if file_path:
             try:
@@ -335,6 +365,7 @@ class WGenGUI:
 
                 # 更新模块列表
                 self._update_modules_list()
+                self._update_hierarchy_view()
             except Exception as e:
                 messagebox.showerror("错误", f"加载Database失败: {str(e)}")
             
@@ -637,20 +668,24 @@ class WGenGUI:
             port_spacing = (rect_height - 40) / (max(1, input_count - 1)) if input_count > 1 else 0
             for i, port in enumerate(input_ports):
                 y_pos = y1 + 30 + port_spacing * i
+                # 根据端口是否有source设置颜色：有source用绿色，无source用红色
+                line_color = "green" if port.source is not None else "red"
                 # 绘制端口线
-                canvas.create_line(x1 - 20, y_pos, x1, y_pos, width=2)
+                canvas.create_line(x1 - 20, y_pos, x1, y_pos, width=2, fill=line_color)
                 # 绘制端口名称，使用VerilogPort对象的name属性
-                canvas.create_text(x1 - 25, y_pos, text=port.name, anchor="e", font=("Arial", 10))
+                canvas.create_text(x1 - 25, y_pos, text=port.name, anchor="e", font=('Arial', 10), fill=line_color)
         
         # 绘制输出端口，从VerilogPort对象获取名称
         if output_count > 0:
             port_spacing = (rect_height - 40) / (max(1, output_count - 1)) if output_count > 1 else 0
             for i, port in enumerate(output_ports):
                 y_pos = y1 + 30 + port_spacing * i
+                # 根据端口的destinations是否为空设置颜色：有目标端口用绿色，无目标端口用红色
+                line_color = "green" if port.destinations else "red"
                 # 绘制端口线
-                canvas.create_line(x2, y_pos, x2 + 20, y_pos, width=2)
+                canvas.create_line(x2, y_pos, x2 + 20, y_pos, width=2, fill=line_color)
                 # 绘制端口名称，使用VerilogPort对象的name属性
-                canvas.create_text(x2 + 25, y_pos, text=port.name, anchor="w", font=("Arial", 10))
+                canvas.create_text(x2 + 25, y_pos, text=port.name, anchor="w", font=('Arial', 10), fill=line_color)
                 
     def _on_drag_start(self, event, canvas_type):
         """开始拖动画布"""
@@ -716,6 +751,87 @@ class WGenGUI:
                 if self.slave_module:
                     self._draw_module_schematic(self.slave_canvas, self.slave_module)
 
+    def _update_hierarchy_view(self):
+        """更新互联hierarchy视图
+        
+        检索self.modules中所有top_module为None的对象（顶级对象），
+        并以改进的多行文本加缩进的方式显示它们的层次结构
+        """
+        # 清空文本框
+        self.hierarchy_text.configure(state=tk.NORMAL)
+        self.hierarchy_text.delete(1.0, tk.END)
+        
+        # 检索所有top_module为None的对象
+        top_modules = [module for module in self.modules if getattr(module, 'top_module', None) is None]
+        
+        hierarchy_text = "# 模块层次结构\n"
+        hierarchy_text += "# ===============\n\n"
+        
+        if not top_modules:
+            # 如果没有top模块，显示提示信息
+            hierarchy_text += "未找到顶级模块\n"
+        else:
+            # 为每个top模块生成层次结构文本
+            for i, top_module in enumerate(top_modules):
+                # 对于顶级模块，is_last总是True，因为它们之间是并列关系
+                is_last_top = (i == len(top_modules) - 1)
+                # 生成top模块的层次结构文本
+                module_text = self._generate_module_hierarchy_text(top_module, 0, is_last_top)
+                hierarchy_text += module_text + "\n\n"
+        
+        # 在文本框中显示层次结构
+        self.hierarchy_text.insert(tk.END, hierarchy_text)
+        self.hierarchy_text.configure(state=tk.DISABLED)  # 设置为只读
+        
+    def _generate_module_hierarchy_text(self, module, indent_level, is_last=False, prefix=[]):
+        """递归生成模块及其包含的模块层次结构文本，使用树形结构指示符增强视觉效果
+        
+        参数:
+            module: 当前模块对象
+            indent_level: 缩进级别
+            is_last: 是否是父模块的最后一个子模块
+            prefix: 前缀列表，用于构建树形结构指示符
+            
+        返回:
+            str: 层次结构文本
+        """
+        # 构建树形结构指示符
+        tree_prefix = ""
+        for i, p in enumerate(prefix):
+            if p:
+                tree_prefix += "│   "
+            else:
+                tree_prefix += "    "
+        
+        if indent_level > 0:
+            if is_last:
+                tree_prefix += "└── "
+            else:
+                tree_prefix += "├── "
+        
+        # 生成模块文本
+        module_text = f"{tree_prefix}{module.name}"
+        
+        # 添加模块属性信息
+        if hasattr(module, 'module_def_name') and module.module_def_name:
+            module_text += f" ({module.module_def_name})"
+        
+        # 添加是否为生成模块的标记
+        if hasattr(module, 'need_gen') and module.need_gen:
+            module_text += " [需要生成]"
+        
+        # 检查模块是否有包含的模块
+        includes = getattr(module, 'includes', [])
+        if includes:
+            new_prefix = prefix + [not is_last]
+            # 为每个包含的模块递归生成文本
+            for i, include_module in enumerate(includes):
+                is_last_child = (i == len(includes) - 1)
+                include_text = self._generate_module_hierarchy_text(include_module, indent_level + 1, is_last_child, new_prefix)
+                module_text += f"\n{include_text}"
+        
+        return module_text
+        
     def _show_about_info(self):
         """显示关于信息对话框
         

@@ -85,7 +85,12 @@ class VerilogModule:
         self.name = name
         self.file_path = file_path
         self.module_def_name = module_def_name
-        self.ports = []  # 存储端口列表
+        self.ports:list[VerilogPort] = []  # 存储端口列表
+        
+        # 模块包含关系(yaml 中定义的包含关系)
+        self.includes:list[VerilogModule] = []  # 存储包含的模块对象
+        self.top_module:VerilogModule = None  # 指向顶级模块的引用
+        self.need_gen:bool = False  # 是否需要生成该模块的Verilog代码
     
     def add_port(self, port):
         """
@@ -622,7 +627,10 @@ class VerilogModuleCollection:
                 'name': module.name,
                 'file_path': module.file_path,
                 'module_def_name': module.module_def_name,
-                'ports': []
+                'ports': [],
+                'includes': [included_module.name for included_module in module.includes],
+                'top_module_name': module.top_module.name if module.top_module else None,
+                'need_gen': module.need_gen
             }
             
             # 序列化模块的所有端口
@@ -695,8 +703,27 @@ class VerilogModuleCollection:
                 )
                 module.add_port(port)
             
+            # 保存模块信息以便后续建立引用关系
+            module_info['__module_object'] = module
             collection.add_module(module)
             module_map[module.name] = module
+        
+        # 建立模块之间的引用关系（includes和top_module）
+        for module_info in data_dict.get('modules', []):
+            module = module_info['__module_object']
+            
+            # 恢复includes引用
+            for included_module_name in module_info.get('includes', []):
+                if included_module_name in module_map:
+                    module.includes.append(module_map[included_module_name])
+            
+            # 恢复top_module引用
+            top_module_name = module_info.get('top_module_name')
+            if top_module_name and top_module_name in module_map:
+                module.top_module = module_map[top_module_name]
+            
+            # 恢复need_gen属性
+            module.need_gen = module_info.get('need_gen', False)
         
         # 然后重建所有连接
         for conn_info in data_dict.get('connections', []):

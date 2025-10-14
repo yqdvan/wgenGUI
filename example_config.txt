@@ -20,3 +20,20 @@ modules:
   - module_name: complex_module
     ins_name: u_complex
     path: ./examples/complex_module.v
+
+generate_modules:
+  - module_name: soc_chip
+    path: ./examples/soc_chip.v
+  - module_name: sublock
+    path: ./examples/sublock.v    
+
+hierarchy_def:
+  - hierarchy: soc_chip
+    includes:
+      - u_simple
+      - u_simple
+      - u_param_module
+      - u_complex
+  - hierarchy: sublock
+    includes:
+      - u_complex
