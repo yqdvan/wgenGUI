@@ -22,14 +22,14 @@ class WGenGUI:
         self.file_handler = FileHandler()
         
         # 存储模块信息
-        self.modules = []
+        self.modules: list['VerilogModule'] = []
         self.master_module: 'VerilogModule' = None
         self.slave_module: 'VerilogModule' = None
         
         # 创建模块集合database
-        self.collection_DB = None
+        self.collection_DB:VerilogModuleCollection = None
         # 初始化一个大小为1024的栈，用于存放collection_DB的历史副本
-        self.connections_DB_stack = deque(maxlen=1024)
+        self.connections_DB_stack: deque[VerilogModuleCollection] = deque(maxlen=1024)
 
         # 存储缩放相关的属性
         self.master_scale = 1.0  # Master电路图的缩放比例
@@ -207,7 +207,7 @@ class WGenGUI:
         
         # 创建端口右键菜单
         self.port_menu = tk.Menu(self.root, tearoff=0)
-        self.port_menu.add_command(label="optionA", command=lambda: self._port_menu_action("optionA", self.current_tree))
+        self.port_menu.add_command(label="断开连接", command=lambda: self._port_menu_action("optionA", self.current_tree))
         self.port_menu.add_command(label="optionB", command=lambda: self._port_menu_action("optionB", self.current_tree))
         
         # 左下部分（Master电路示意图）
@@ -241,7 +241,7 @@ class WGenGUI:
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="打开配置文件", command=self._open_config_file)
         file_menu.add_command(label="打开Database", command=self._open_database)
-        file_menu.add_command(label="保存Database", command=self.save_database)
+        file_menu.add_command(label="保存Database", command=self._save_database)
         file_menu.add_separator()
         file_menu.add_command(label="退出", command=self.root.quit)
         
@@ -277,7 +277,7 @@ class WGenGUI:
         if from_port_obj and to_port_obj:
             try:
                 self.collection_DB.connect_port(from_port_obj, to_port_obj)
-                save_result = self.save_database()
+                save_result = self._save_database()
                 messagebox.showinfo("成功", f"已成功连接 {self.master_module.name}.{master_port} -> {self.slave_module.name}.{slave_port} \n{save_result}")
                   
             except Exception as e:
@@ -316,6 +316,11 @@ class WGenGUI:
             
     def _open_database(self):
         """打开并加载数据库文件，更新模块列表"""
+        for item in self.master_ports_tree.get_children():
+            self.master_ports_tree.delete(item)
+        for item in self.slave_ports_tree.get_children():
+            self.slave_ports_tree.delete(item)
+            
         file_path = self.file_handler.open_database_dialog()
         if file_path:
             try:
@@ -333,7 +338,7 @@ class WGenGUI:
             except Exception as e:
                 messagebox.showerror("错误", f"加载Database失败: {str(e)}")
             
-    def save_database(self):
+    def _save_database(self):
         """保存database到文件"""
         if self.collection_DB:
             try:
@@ -493,23 +498,82 @@ class WGenGUI:
     
     def _port_menu_action(self, action, tree=None):
         """端口右键菜单操作"""
-        # 获取当前选中的端口信息，如果指定了tree则直接使用该tree
+        # 确定当前操作的是哪个tree以及端口信息
+        tree_type = ""
+        port_name = ""
+        port_obj:VerilogPort  = None
+        
         if tree is not None:
+            # 确定tree的类型
+            if tree == self.master_ports_tree:
+                tree_type = "master"
+            elif tree == self.slave_ports_tree:
+                tree_type = "slave"
+            
+            # 获取选中的端口信息
             selected_items = tree.selection()
             if selected_items:
                 port_name = tree.item(selected_items[0])['values'][0]
-                messagebox.showinfo("操作提示", f"你点击了{action}操作，端口：{port_name}")
+                
         else:
-            # 原来的逻辑作为后备
+            # 检查哪个tree有选中的项目
             selected_master_items = self.master_ports_tree.selection()
             selected_slave_items = self.slave_ports_tree.selection()
             
             if selected_master_items:
+                tree_type = "master"
                 port_name = self.master_ports_tree.item(selected_master_items[0])['values'][0]
-                messagebox.showinfo("操作提示", f"你点击了{action}操作，端口：{port_name}")
             elif selected_slave_items:
+                tree_type = "slave"
                 port_name = self.slave_ports_tree.item(selected_slave_items[0])['values'][0]
-                messagebox.showinfo("操作提示", f"你点击了{action}操作，端口：{port_name}")
+        
+        if tree_type == "master" and action == "optionA":
+            port_obj = self.master_module.get_port(port_name)
+            if port_obj:
+                # 检查port_obj的destinations数量
+                le = len(port_obj.destinations)
+                # 弹窗询问用户是否删除所有连接
+                confirm = messagebox.askyesno("确认删除", f"是否删除主端口 {port_name} 内所有 {le} 个 load 连接？")
+                if confirm:
+                    ans_str = self.collection_DB.remove_master_port_connections(port_obj)
+                    if ans_str is None or ans_str == "":
+                        self._save_database()
+                        messagebox.showinfo("成功", "删除连接成功")
+                        print(f"成功删除主端口 {port_name} 的连接")
+
+                    else:
+                        messagebox.showerror("错误", ans_str)
+            else:
+                messagebox.showerror("错误", f"端口 {port_name} 不是 VerilogPort 类型")
+            self._update_master_display()
+            self._update_slave_display()
+
+        elif tree_type == "slave" and action == "optionA":  
+            port_obj = self.slave_module.get_port(port_name)
+            if port_obj:
+                ans_str = self.collection_DB.remove_slave_port_connection(port_obj)
+                if ans_str is None or ans_str == "":
+                    self._save_database()
+                    messagebox.showinfo("成功", "删除连接成功")
+                    print(f"成功删除从端口 {port_name} 的连接")
+                else:
+                    messagebox.showerror("错误", ans_str)
+            else:
+                messagebox.showerror("错误", f"端口 {port_name} 不是 VerilogPort 类型")
+            self._update_master_display()
+            self._update_slave_display()
+
+        else:
+            messagebox.showinfo("操作提示", f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}")
+
+        # # 根据操作类型显示不同的消息
+        # if action == "optionA":
+        #     messagebox.showinfo("操作提示", f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}")
+        # elif action == "optionB":
+        #     messagebox.showinfo("操作提示", f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}")
+        # else:
+        #     # 其他操作保持原有逻辑
+        #     messagebox.showinfo("操作提示", f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}")
     
     def _draw_module_schematic(self, canvas, module):
         """绘制模块电路示意图"""

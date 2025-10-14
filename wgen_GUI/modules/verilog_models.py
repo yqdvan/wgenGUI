@@ -434,6 +434,83 @@ class VerilogModuleCollection:
         if dest_port.is_input() or dest_port.is_inout():
             dest_port.source = source_port
     
+
+    def remove_master_port_connections(self, master_port: VerilogPort):
+        """
+        删除主端口的连接
+        
+        参数:
+            master_port (VerilogPort): 主端口
+        
+        返回:
+            str: 操作结果消息
+        """
+        ans = False
+        message_str = ""
+        
+        # 检查主端口是否有连接
+        if not master_port.destinations:
+            message_str = f"主端口 {master_port.name} 没有load!!"
+            return message_str
+        
+        # 从每个目标端口的destinations列表中移除主端口
+        for dest_port in master_port.destinations:
+            if master_port is dest_port.source:
+                self.remove_slave_port_connection(dest_port)
+                ans = True
+            else:
+                message_str = f"主端口 {master_port.name} load {dest_port.name}, BUT NOT FROM IT !!!"
+                ans = False
+                break
+        
+        # 清空主端口的destinations列表
+        if ans:
+            master_port.destinations.clear()
+            # message_str = f"成功删除主端口 {master_port.name} 的所有连接"
+        
+        return message_str
+
+
+    def remove_slave_port_connection(self, slave_port: VerilogPort):
+        """
+        删除从端口的连接
+        
+        参数:
+            slave_port (VerilogPort): 从端口
+        
+        返回:
+            str: 操作结果消息
+        """
+        message_str = ""
+        # 检查从端口是否有连接
+        if not slave_port.source:
+            message_str = f"从端口 {slave_port.name} 没有driver!!"
+            return message_str
+        
+        # 先获取源端口信息，再移除从端口的源引用
+        source_port = slave_port.source
+        source_module_name = source_port.father_module.name
+        source_port_name = source_port.name
+        dest_module_name = slave_port.father_module.name
+        dest_port_name = slave_port.name
+        
+        # 移除从端口的源引用
+        slave_port.source = None
+        
+        # 从源端口的destinations列表中移除从端口
+        if slave_port in source_port.destinations:
+            ans = self.remove_connection(source_module_name, source_port_name, dest_module_name, dest_port_name)
+            if ans:
+                # message_str = f"成功删除从端口 {slave_port.name} 的连接"
+                message_str = ""
+            else:
+                message_str = f"删除从端口 {slave_port.name} 的连接失败"
+        else:
+            message_str = f"从端口 {slave_port.name} 不在源端口的连接列表中"
+        
+        return message_str
+
+
     def remove_connection(self, source_module_name, source_port_name, dest_module_name, dest_port_name):
         """
         删除模块之间的连接
