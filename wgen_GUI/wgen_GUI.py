@@ -5,6 +5,8 @@ from collections import deque
 from modules.verilog_parser import VerilogParser
 from modules.verilog_models import VerilogModuleCollection, VerilogPort
 from modules.file_handler import FileHandler
+from modules.toast import Toast
+
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
@@ -338,7 +340,9 @@ class WGenGUI:
 
                 self.collection_DB.connect_port(from_port_obj, to_port_obj, from_bit_range, to_bit_range)
                 save_result = self._save_database()
-                messagebox.showinfo("成功", f"已成功连接 {self.master_module.name}.{master_port} -> {self.slave_module.name}.{slave_port} \n{save_result}")
+                show_str = f"已成功连接 {self.master_module.name}.{master_port} -> {self.slave_module.name}.{slave_port} \n{save_result}"
+                # messagebox.showinfo("成功", show_str)
+                Toast(self.root, show_str, duration=2000, position='top')
                 self._update_master_display()
                 self._update_slave_display()
             except Exception as e:
@@ -360,7 +364,8 @@ class WGenGUI:
                 self.modules = modules
                 self._update_modules_list()
                 self._update_hierarchy_view()
-                messagebox.showinfo("成功", f"配置文件已加载，共包含 {len(modules)} 个模块")
+                show_str = f"配置文件已加载成功！！共包含 {len(modules)} 个模块"
+                Toast(self.root, show_str, duration=2000, position='top')
                 self._initialize_collection_DB()
         except Exception as e:
             messagebox.showerror("错误", f"加载配置文件失败: {str(e)}")
@@ -391,7 +396,8 @@ class WGenGUI:
                 self.collection_DB = self.file_handler.load_database(file_path)
                 
                 # 显示加载成功信息
-                messagebox.showinfo("成功", f"Database已从 {file_path} 加载")
+                show_str = f"Database已从 {file_path} 加载成功！！"
+                Toast(self.root, show_str, duration=2000, position='top')
 
                 # 直接使用VerilogModule对象，不再转换为结构体
                 self.modules = self.collection_DB.modules
@@ -418,7 +424,8 @@ class WGenGUI:
                     # 调用_save_database函数，传入用户选择的文件路径和软件版本
                     save_result = self._save_database(file_path, self.version)  
                     if save_result:
-                        messagebox.showinfo("保存成功", save_result)
+                        show_str = f"Database已成功保存到:\n{file_path}"
+                        Toast(self.root, show_str, duration=2000, position='top')
                         return save_result
                 else:
                     # 用户取消了保存操作
@@ -663,7 +670,8 @@ class WGenGUI:
             self._update_slave_display()
 
         else:
-            messagebox.showinfo("操作提示", f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}")
+            show_str = f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}"
+            Toast(self.root, show_str, duration=2000, position='top')
 
         # # 根据操作类型显示不同的消息
         # if action == "optionA":
