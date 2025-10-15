@@ -47,7 +47,14 @@ class VerilogPort:
 
         return f"father md: {self.father_module.name}\nport type: {self.direction}\nport name: {self.name}{width_str}\n{source_info}\n{dest_info}"
 
-  
+    def get_width_value(self) -> int:
+        """获取端口的位宽"""
+        return self.width['high'] - self.width['low'] + 1
+
+    def get_bit_range(self):
+        """获取端口的位宽范围字符串"""
+        return {'high': self.width['high'], 'low': self.width['low']}
+
     def is_input(self):
         """判断是否为输入端口"""
         return self.direction == 'input'
@@ -104,7 +111,17 @@ class VerilogModule:
             port.father_module = self  # 记录端口所属模块
         else:
             raise TypeError("添加的端口必须是VerilogPort类型")
-    
+
+    def add_ports(self, ports:list[VerilogPort]):
+        """
+        添加多个端口到模块
+        
+        参数:
+            ports (list): 要添加的端口对象列表
+        """
+        for port in ports:
+            self.add_port(port)
+
     def get_ports_by_direction(self, direction):
         """
         获取指定方向的端口列表

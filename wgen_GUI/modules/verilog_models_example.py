@@ -1,6 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import sys
+import os
+
+# 添加项目根目录到Python路径，使Python能够识别包结构
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# 从正确的模块导入VerilogPortParser
+from wgen_GUI.modules.verilog_parser import VerilogPortParser 
+my_parser = VerilogPortParser(r"C:\Users\yqduan\Documents\trae_projects\wgenGUI\examples\simple_module.v")
+
+print(my_parser.ports)
+
+exit(0)
+
+
+
 """
 Verilog模块数据结构使用示例
 

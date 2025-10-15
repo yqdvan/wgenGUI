@@ -307,7 +307,36 @@ class WGenGUI:
         
         if from_port_obj and to_port_obj:
             try:
-                self.collection_DB.connect_port(from_port_obj, to_port_obj)
+                from_bit_range = from_port_obj.get_bit_range()
+                to_bit_range = to_port_obj.get_bit_range()
+                # 判断两个端口的width宽度是否一致
+                if from_port_obj.get_width_value() == to_port_obj.get_width_value():
+                    pass  # 宽度一致，按原流程走
+                elif (from_bit_range['high'] - from_bit_range['low']) < (to_bit_range['high'] - to_bit_range['low']):
+                    messagebox.showerror("错误", f"端口 {from_port_obj.name} 宽度为 {from_bit_range}，端口 {to_port_obj.name} 宽度为 {to_bit_range}。to的位宽不能大于from的位宽！")
+                    return
+                else:
+                    # 弹出窗口让用户输入端口宽度
+                    new_width = simpledialog.askstring(
+                        "源端口宽度大于目标端口宽度",
+                        f"端口 {from_port_obj.name} 宽度为 {from_bit_range}，端口 {to_port_obj.name} 宽度为 {to_bit_range}。\n请输入源端口范围（格式如 [high:low]）："
+                    )
+                    if new_width:
+                        try:
+                            # 解析用户输入的宽度
+                            high, low = map(int, new_width.strip('[]').split(':'))
+                            from_bit_range = {'high': high, 'low': low}
+                            if (from_bit_range['high'] - from_bit_range['low']) != (to_bit_range['high'] - to_bit_range['low']):
+                                messagebox.showerror("错误", f"端口位宽仍然不匹配，请重新操作！{from_bit_range},{to_bit_range}")
+                                return
+     
+                        except Exception:
+                            messagebox.showerror("错误", "输入的端口宽度格式不正确，请使用 [high:low] 格式！")
+                            return
+                    else:
+                        return  # 用户取消输入，退出连接操作
+
+                self.collection_DB.connect_port(from_port_obj, to_port_obj, from_bit_range, to_bit_range)
                 save_result = self._save_database()
                 messagebox.showinfo("成功", f"已成功连接 {self.master_module.name}.{master_port} -> {self.slave_module.name}.{slave_port} \n{save_result}")
                 self._update_master_display()

@@ -20,6 +20,9 @@ modules:
   - module_name: complex_module
     ins_name: u_complex
     path: ./examples/complex_module.v
+  - module_name: axi4_fifo
+    ins_name: u_axi4_fifo
+    path: ./examples/axi4_fifo.v
 
 generate_modules:
   - module_name: soc_chip
@@ -34,6 +37,8 @@ hierarchy_def:
       - u_simple
       - u_param_module
       - u_complex
+      - sublock
   - hierarchy: sublock
     includes:
       - u_complex
+      - u_axi4_fifo

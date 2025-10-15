@@ -31,7 +31,7 @@ class FileHandler:
         
         参数:
             file_path (str): 配置文件的路径
-            parser: 配置文件解析器实例
+            parser (VerilogParser): 配置文件解析器实例  
             
         返回:
             list: 解析后的模块列表
