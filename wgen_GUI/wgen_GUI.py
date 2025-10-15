@@ -39,6 +39,18 @@ class WGenGUI:
         self.slave_scale = 1.0   # Slave电路图的缩放比例
         self.selected_canvas = None  # 当前选中的canvas
         
+        # 添加空格键快捷键来触发创建连接操作
+        # 使用bind_all确保无论焦点在哪个控件上，快捷键都能响应
+        # 添加return "break"防止事件冒泡，确保事件被正确处理
+        def on_space_press(event):
+            print("space！")
+            self._create_connection()
+            return "break"  # 防止事件冒泡
+        
+        self.root.bind_all('<space>', on_space_press)
+        # 确保根窗口能接收键盘事件
+        self.root.focus_set()
+        
         # 存储画布偏移量
         self.master_offset_x = 0  # Master画布的X偏移
         self.master_offset_y = 0  # Master画布的Y偏移
@@ -273,6 +285,8 @@ class WGenGUI:
         file_menu.add_command(label="打开Database", command=self._open_database)
         file_menu.add_command(label="保存Database", command=self._user_save_database)
         file_menu.add_separator()
+        file_menu.add_command(label="增量更新Database", command=self._try_update_database)   
+        file_menu.add_separator()     
         file_menu.add_command(label="退出", command=self.root.quit)
         
         # 添加文件按钮
@@ -281,12 +295,27 @@ class WGenGUI:
         # 添加创建连接按钮
         menu_bar.add_command(label="创建连接", command=self._create_connection)
 
+        # 添加帮助菜单
+        help_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="帮助", menu=help_menu)
+        help_menu.add_command(label="快捷键列表", command= lambda: messagebox.showinfo("快捷键列表", "空格：创建连接\n"))   
+
         # 添加关于菜单
         about_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="关于", menu=about_menu)
-        about_menu.add_command(label="关于wgen_GUI", command=self._show_about_info)   
+        about_menu.add_command(label="关于wgen_GUI", command=self._show_about_info)  
 
         self.root.config(menu=menu_bar)
+
+    def _try_update_database(self):
+        """增量更新Database按钮的响应函数"""
+        # 弹出确认对话框
+        messagebox.showwarning("Warning", "敏感操作，可能毁坏现有数据库，更新前务必保存当前数据库！")
+
+        # 增量更新数据库
+        messagebox.showinfo("Info", "正在开发，敬请期待！")
+        
+
 
     def _create_connection(self):
         """创建连接按钮的响应函数，显示选中的master和slave端口"""
