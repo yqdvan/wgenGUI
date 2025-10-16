@@ -6,6 +6,7 @@ from modules.verilog_parser import VerilogParser
 from modules.verilog_models import VerilogModuleCollection, VerilogPort
 from modules.file_handler import FileHandler
 from modules.toast import Toast
+from modules.wgen_config_generator import WgenConfigGenerator
 
 
 class WGenGUI:
@@ -287,6 +288,8 @@ class WGenGUI:
         file_menu.add_separator()
         file_menu.add_command(label="增量更新Database", command=self._try_update_database)   
         file_menu.add_separator()     
+        file_menu.add_command(label="导出wgen_config", command=self._export_wgen_config)        
+        file_menu.add_separator()     
         file_menu.add_command(label="退出", command=self.root.quit)
         
         # 添加文件按钮
@@ -306,6 +309,38 @@ class WGenGUI:
         about_menu.add_command(label="关于wgen_GUI", command=self._show_about_info)  
 
         self.root.config(menu=menu_bar)
+
+    def _export_wgen_config(self):
+        """导出wgen_config按钮的响应函数"""
+        # 弹出确认对话框
+        generator = WgenConfigGenerator()
+        
+        try:
+            wgen_config_txt = generator.generate_by_DB(self.collection_DB)
+        except Exception as e:
+            messagebox.showerror("错误", f"导出wgen_config时发生错误: {str(e)}")
+            return
+        # 打开文件保存交互窗口，询问用户保存文件的名字与路径
+        file_path = filedialog.asksaveasfilename(
+            title="保存wgen_config",
+            defaultextension=".txt",
+            filetypes=[("文本文件", "*.config"), ("所有文件", "*.*")]
+        )
+
+        # 如果用户选择了文件路径，则保存wgen_config_txt
+        if file_path:
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(wgen_config_txt)
+                messagebox.showinfo("成功", f"wgen_config 已成功保存到:\n{file_path}")
+            except Exception as e:
+                messagebox.showerror("错误", f"保存wgen_config时发生错误: {str(e)}")
+        else:
+            # 用户取消了保存操作
+            Toast("用户取消了保存操作")
+            pass
+        
+
 
     def _try_update_database(self):
         """增量更新Database按钮的响应函数"""
@@ -483,10 +518,10 @@ class WGenGUI:
                     return save_result
             except Exception as e:
                 messagebox.showerror("错误", f"保存Database失败: {str(e)}")
-                return "save Failed"
+                return ""
         else:
             messagebox.showwarning("警告", "没有可保存的Database")
-            return "save Failed"
+            return ""
 
     
     def _update_modules_list(self):
@@ -672,10 +707,13 @@ class WGenGUI:
                 if confirm:
                     ans_str = self.collection_DB.remove_master_port_connections(port_obj)
                     if ans_str is None or ans_str == "":
-                        self._save_database()
-                        messagebox.showinfo("成功", "删除连接成功")
-                        print(f"成功删除主端口 {port_name} 的连接")
-
+                        save_result = self._save_database()
+                        if save_result is not None and save_result != "":
+                            Toast(self.root, "删除连接成功\n" + save_result, duration=2000, position='top')
+                            print(f"成功删除主端口 {port_name} 的连接")
+                        else:
+                            save_result = "save failed!!!"
+                            messagebox.showerror("错误", save_result)
                     else:
                         messagebox.showerror("错误", ans_str)
             else:
@@ -688,9 +726,13 @@ class WGenGUI:
             if port_obj:
                 ans_str = self.collection_DB.remove_slave_port_connection(port_obj)
                 if ans_str is None or ans_str == "":
-                    self._save_database()
-                    messagebox.showinfo("成功", "删除连接成功")
-                    print(f"成功删除从端口 {port_name} 的连接")
+                    save_result = self._save_database()
+                    if save_result is not None and save_result != "":
+                        Toast(self.root, "删除连接成功\n" + save_result, duration=2000, position='top')
+                        print(f"成功删除从端口 {port_name} 的连接")
+                    else:
+                        save_result = "save failed!!!"
+                        messagebox.showerror("错误", save_result)
                 else:
                     messagebox.showerror("错误", ans_str)
             else:

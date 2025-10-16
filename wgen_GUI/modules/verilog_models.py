@@ -12,10 +12,11 @@ class VerilogPort:
             source (VerilogPort or None): 输入信号的源头端口实例，默认为None
         """
         self.name = name
-        self.direction = direction.lower()  # 转换为小写以确保一致性
+        self.direction:str = direction.lower()  # 转换为小写以确保一致性
         self.father_module:VerilogModule = father_module
         
         # 设置默认位宽为1位
+        self.width:dict = None
         if width is None:
             self.width = {'high': 0, 'low': 0}
         else:
@@ -89,10 +90,11 @@ class VerilogModule:
             file_path (str): 模块所在文件路径，默认为空字符串
             module_def_name (str): 模块定义名称，默认为空字符串
         """
-        self.name = name
+        self.name = name # is instance name
         self.file_path = file_path
         self.module_def_name = module_def_name
         self.ports:list[VerilogPort] = []  # 存储端口列表
+        self.parameters:dict[str, int] = {}  # 存储参数，键为字符串，值为整数
         
         # 模块包含关系(yaml 中定义的包含关系)
         self.includes:list[VerilogModule] = []  # 存储包含的模块对象
@@ -222,7 +224,7 @@ class VerilogModule:
 class VerilogConnection:
     """Verilog连接类，用于描述两个模块之间的连接"""
     
-    def __init__(self, source_module, source_port, dest_module, dest_port, source_bit_range=None, dest_bit_range=None):
+    def __init__(self, source_module:VerilogModule, source_port:VerilogPort, dest_module:VerilogModule, dest_port:VerilogPort, source_bit_range=None, dest_bit_range=None):
         """
         初始化Verilog连接
         
@@ -235,10 +237,8 @@ class VerilogConnection:
             dest_bit_range (dict, optional): 目标端口使用的位范围，格式为 {'high': int, 'low': int}
         """
         # 验证参数类型
-        if not isinstance(source_port, VerilogPort):
-            raise TypeError("源端口必须是VerilogPort类型")
-        if not isinstance(dest_port, VerilogPort):
-            raise TypeError("目标端口必须是VerilogPort类型")
+        # self.source_module = source_module
+        # self.dest_module = dest_module
             
         # 验证端口方向是否兼容
         if not (source_port.is_output() or source_port.is_inout()):
@@ -276,6 +276,18 @@ class VerilogConnection:
         else:
             self.dest_module_name = 'unknown_module'
     
+    def _get_width_value(self, bit_range):
+        """
+        计算位范围的宽度值（高索引 - 低索引 + 1）
+        
+        参数:
+            bit_range (dict): 包含'high'和'low'键的位范围字典
+            
+        返回:
+            int: 位范围的宽度值
+        """
+        return bit_range['high'] - bit_range['low'] + 1
+
     def _validate_bit_range(self, bit_range, port_width):
         """
         验证位范围是否在端口位宽范围内
@@ -330,8 +342,8 @@ class VerilogModuleCollection:
     
     def __init__(self):
         """初始化模块集合"""
-        self.modules = []  # 存储模块列表
-        self.connections = []  # 存储模块之间的连接
+        self.modules: list[VerilogModule] = []  # 存储模块列表
+        self.connections: list[VerilogConnection] = []  # 存储模块之间的连接
     
     def add_module(self, module):
         """
@@ -647,7 +659,8 @@ class VerilogModuleCollection:
                 'ports': [],
                 'includes': [included_module.name for included_module in module.includes],
                 'top_module_name': module.top_module.name if module.top_module else None,
-                'need_gen': module.need_gen
+                'need_gen': module.need_gen,
+                'parameters': module.parameters
             }
             
             # 序列化模块的所有端口
@@ -741,6 +754,9 @@ class VerilogModuleCollection:
             
             # 恢复need_gen属性
             module.need_gen = module_info.get('need_gen', False)
+            
+            # 恢复parameters属性
+            module.parameters = module_info.get('parameters', {})
         
         # 然后重建所有连接
         for conn_info in data_dict.get('connections', []):
