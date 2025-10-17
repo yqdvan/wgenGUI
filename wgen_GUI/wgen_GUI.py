@@ -1003,6 +1003,11 @@ WGenGUI 版本 {self.version}
 if __name__ == "__main__":
     # 检查是否安装了yaml库
     try:
+        import sys
+        import os
+        
+        # 添加lib目录到Python路径
+        sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
         import yaml
     except ImportError:
         import sys

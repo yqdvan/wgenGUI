@@ -28,7 +28,7 @@ generate_modules:
   - module_name: soc_chip
     path: ./examples/soc_chip.v
   - module_name: sublock
-    path: ./examples/sublock.v    
+    path: ./examples/sublock.v
 
 hierarchy_def:
   - hierarchy: soc_chip

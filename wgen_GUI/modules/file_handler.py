@@ -1,8 +1,11 @@
 import os
+import sys
 import copy
 import datetime
 import json
-import os
+
+# 添加lib目录到Python路径
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
 import yaml
 from tkinter import filedialog, messagebox
 from modules.verilog_models import VerilogModuleCollection

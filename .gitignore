@@ -3,6 +3,7 @@
 
 # 忽略Python编译缓存目录
 __pycache__/
+install_offline/
 *.json
 *.v
 *.config
