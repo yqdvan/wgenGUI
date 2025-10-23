@@ -7,7 +7,7 @@ from modules.verilog_models import VerilogModuleCollection, VerilogPort
 from modules.file_handler import FileHandler
 from modules.toast import Toast
 from modules.wgen_config_generator import WgenConfigGenerator
-
+from tkinter import ttk
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
@@ -16,6 +16,11 @@ class WGenGUI:
         """初始化GUI界面"""
         self.root = root
         self.root.title(f"wgen_GUI {self.version}")
+
+        style = ttk.Style()
+        style.theme_use('clam')  # 使用clam主题
+
+
         self.root.geometry("1200x800")
 
         
@@ -223,7 +228,11 @@ class WGenGUI:
         self.master_canvas.bind("<Button-1>", lambda event: self._on_drag_start(event, "master"))
         self.master_canvas.bind("<B1-Motion>", lambda event: self._on_drag_motion(event, "master"))
         self.master_canvas.bind("<ButtonRelease-1>", self._on_drag_end)
+        # Windows鼠标滚轮事件
         self.master_canvas.bind("<MouseWheel>", lambda event: self._on_mousewheel(event, "master"))
+        # Linux鼠标滚轮事件
+        self.master_canvas.bind("<Button-4>", lambda event: self._on_mousewheel(event, "master"))
+        self.master_canvas.bind("<Button-5>", lambda event: self._on_mousewheel(event, "master"))
         
         # Slave部分 - 右侧
         # 创建Slave内部PanedWindow - 上下布局
@@ -273,7 +282,11 @@ class WGenGUI:
         self.slave_canvas.bind("<Button-1>", lambda event: self._on_drag_start(event, "slave"))
         self.slave_canvas.bind("<B1-Motion>", lambda event: self._on_drag_motion(event, "slave"))
         self.slave_canvas.bind("<ButtonRelease-1>", self._on_drag_end)
+        # Windows鼠标滚轮事件
         self.slave_canvas.bind("<MouseWheel>", lambda event: self._on_mousewheel(event, "slave"))
+        # Linux鼠标滚轮事件
+        self.slave_canvas.bind("<Button-4>", lambda event: self._on_mousewheel(event, "slave"))
+        self.slave_canvas.bind("<Button-5>", lambda event: self._on_mousewheel(event, "slave"))
     
     
     def _create_menu(self):
@@ -849,6 +862,8 @@ class WGenGUI:
             
     def _on_drag_motion(self, event, canvas_type):
         """拖动画布时的移动事件"""
+        print("\n拖动画布时的移动事件")
+        print("当前事件:", event)
         if self.is_dragging:
             # 计算鼠标移动的距离
             dx = event.x - self.last_x
@@ -879,14 +894,26 @@ class WGenGUI:
         self.selected_canvas = canvas
         
     def _on_mousewheel(self, event, canvas_type):
-        """处理鼠标滚轮事件，实现缩放功能"""
+        """处理鼠标滚轮事件，实现缩放功能（跨平台兼容）"""
         # 检查当前画布是否被选中
+        print("\n处理鼠标滚轮事件，实现缩放功能")
+        print("当前事件:", event)
         if (canvas_type == "master" and self.selected_canvas == self.master_canvas) or \
            (canvas_type == "slave" and self.selected_canvas == self.slave_canvas):
-            # 获取滚动方向
-            delta = event.delta
-            # Windows系统中，event.delta为120的倍数，表示滚动的增量
-            zoom_factor = 1.1 if delta > 0 else 0.9
+            # 跨平台滚动方向判断
+            # Windows使用event.delta，Linux使用event.num（Button-4=向上，Button-5=向下）
+            zoom_factor = 1.1
+
+            if hasattr(event, 'num') and event.num in [4, 5]:
+                # Linux平台
+                print("Linux平台鼠标滚轮事件，event.num =", event.num)
+                zoom_factor = 1.1 if event.num == 4 else 0.9
+            elif hasattr(event, 'delta'):
+                # Windows平台
+                print("Windows平台鼠标滚轮事件，event.delta =", event.delta)
+                delta = event.delta
+                zoom_factor = 1.1 if delta > 0 else 0.9
+
             
             # 更新缩放比例
             if canvas_type == "master":

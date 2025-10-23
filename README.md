@@ -12,7 +12,7 @@ wgen_GUI是一个基于Python的GUI程序，用于展示多个Verilog文件的�
 
 ## 环境要求
 
-- Python 3.x
+- Python 3.11.x
 - tkinter（通常是Python标准库的一部分）
 - pyyaml
 
