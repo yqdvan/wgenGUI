@@ -1,3 +1,4 @@
+from time import sleep
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog, filedialog
 import copy
@@ -76,7 +77,7 @@ class WGenGUI:
         """显示启动选择对话框，使用tkinter内置的是/否按钮对话框"""
         # 使用messagebox.askyesno显示是/否对话框
         result = messagebox.askyesno(
-            title="启动选择",
+            title=f"wgen_GUI {self.version} 启动选择",
             message="是否继续上一次工作？\n\n“是”：选择您保存的database，“否”：打开配置文件初始化数据库"
         )
         
@@ -771,6 +772,15 @@ class WGenGUI:
         # 清空画布
         canvas.delete("all")
         
+        # 获取当前ttk主题的背景色作为矩形填充色
+        style = ttk.Style()
+        # 尝试获取不同元素的背景色，确保能获得合适的填充色
+        try:
+            fill_color = style.lookup("Frame", "background")
+        except:
+            # 如果获取失败，使用默认的浅灰色
+            fill_color = "#f0f0f0"
+
         # 获取画布尺寸
         width = canvas.winfo_width()
         height = canvas.winfo_height()
@@ -816,8 +826,8 @@ class WGenGUI:
         x2 = x1 + rect_width
         y2 = y1 + rect_height
         
-        # 绘制模块矩形
-        canvas.create_rectangle(x1, y1, x2, y2, outline="black", width=2)
+        # 绘制模块矩形，使用主题背景色填充
+        canvas.create_rectangle(x1, y1, x2, y2, outline="black", width=2, fill=fill_color)
         
         # 绘制模块名称，使用VerilogModule对象的name属性
         text_show = "\n"+module.name + "\n (" + module.module_def_name + ")"
@@ -1028,26 +1038,69 @@ WGenGUI 版本 {self.version}
         tk.messagebox.showinfo("关于 WGenGUI", about_message)
 
 if __name__ == "__main__":
+    # 首先导入必要的库
+    import sys
+    import os
+    import tkinter as tk
+
+    # 添加模块目录到Python路径
+    sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
+
+    from splash_screen import SplashScreen
+    # 显示启动窗口
+    splash_root = tk.Tk()
+    splash = SplashScreen(splash_root, WGenGUI.version)
+    splash_root.update()
+    
     # 检查是否安装了yaml库
     try:
-        import sys
-        import os
-        
         # 添加lib目录到Python路径
         sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
         import yaml
+        splash.update_loading_text("导入yaml库...   成功")
+        sleep(0.5)
+        splash.update_loading_text(f"yaml版本: {yaml.__version__}")
+        sleep(0.5)        
+        
+        # 更新加载信息
+        splash.update_loading_text(f"初始化配置... (tk版本: {tk.TkVersion})")
+        sleep(0.5)
+
+        splash.update_loading_text(f"wgen_GUI版本: {WGenGUI.version}")
+        sleep(0.5)        
+        
     except ImportError:
-        import sys
-        print("正在安装必要的依赖库...")
+        # 更新加载信息
+        splash.update_loading_text("正在安装依赖库...")
+        
         try:
             import subprocess
             subprocess.check_call([sys.executable, "-m", "pip", "install", "pyyaml"])
-            print("依赖库安装成功")
+            splash.update_loading_text("依赖库安装成功")
         except Exception as e:
             print(f"依赖库安装失败: {e}")
+            splash.update_loading_text("依赖库安装失败")
             sys.exit(1)
     
-    # 创建主窗口并运行应用
-    root = tk.Tk()
-    app = WGenGUI(root)
-    root.mainloop()
+    # 更新加载信息为最后一步
+    splash.update_loading_text("准备启动应用...")
+    
+    # 1秒后关闭启动窗口并启动主应用
+    def close_splash():
+        # 先停止进度条动画
+        splash.stop()
+        # 销毁启动窗口
+        splash_root.destroy()
+        # 创建主应用
+        root = tk.Tk()
+        app = WGenGUI(root)
+        root.mainloop()
+    
+    # 1秒后执行关闭函数
+    splash_root.after(600, close_splash)  # 1000毫秒 = 1秒
+    
+    # 启动启动窗口的主循环
+    splash_root.mainloop()
+    # 主应用将在splash窗口关闭后通过close_splash函数启动
+
+

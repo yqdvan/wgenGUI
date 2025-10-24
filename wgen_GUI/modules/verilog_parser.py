@@ -191,14 +191,92 @@ class VerilogPortParser:
         # 删除空白行
         content = re.sub(r'\n\s*\n', '\n', content, flags=re.MULTILINE)
         
+        # 保存从开头到第一个右括号后跟零个或多个非打印字符以及分号的内容
+        head_content_match = re.search(r'^.*?\)\s*;', content, re.DOTALL)
+        head_content = head_content_match.group(0) if head_content_match else ''
+        
+        # 判断head_content 中是否包含parameter 关键字，如果包含就将 parameter所在的左右括号包含起来的字符串提出来 命名为 par_content,剩下的字符串命名为 port_content
+        if 'parameter' in head_content:
+            # 匹配parameter及其左右括号内容
+            par_match = re.search(r'#\s*\([^)]*\)', head_content, re.DOTALL)
+            if par_match:
+                par_content = par_match.group(0)
+                # 剩余部分为port_content
+                port_content = head_content.replace(par_content, '')
+            else:
+                par_content = ''
+                port_content = head_content
+        else:
+            par_content = ''
+            port_content = head_content
+
+        if par_content:
+            # 提取参数信息
+            self._extract_parameters(par_content)
+
         # 提取模块名和参数
-        self._extract_module_name_and_parameters(content)
+        self._extract_module_name(port_content)
         
         # 确定Verilog代码风格并提取端口信息
         self._extract_ports_by_style(content)
 
+
+
+    def _extract_parameters(self, par_content):
+        """
+        从parameter定义字符串中提取所有parameter名称与默认值
+        支持如下形式：
+            parameter WIDTH = 8,
+            parameter DEPTH = 16,
+            parameter [7:0] DATA = 8'hFF
+        """
+        # 移除parameter括号外围的 "#(" 与 ")"
+        inner = re.sub(r'^\s*#\s*\(\s*', '', par_content)
+        inner = re.sub(r'\s*\)\s*$', '', inner)
+
+        # 按逗号切分多条定义，但需避开括号内的逗号
+        # 简单处理：先按顶层逗号切分，再恢复括号内的逗号
+        pieces = self._split_top_level(inner, ',')
+
+        for piece in pieces:
+            piece = piece.strip()
+            if not piece:
+                continue
+
+            # 匹配：parameter [vec] name = value
+            m = re.match(
+                r'parameter\s*(?:\[(.*?)\])?\s*([a-zA-Z_]\w*)\s*=\s*(.+)$',
+                piece
+            )
+            if not m:
+                continue
+
+            vec, name, value = m.groups()
+            # 去掉value末尾可能多余的分号
+            value = value.rstrip(';').strip()
+            self.parameters[name] = value
+
+    def _split_top_level(self, text, sep):
+        """
+        按顶层分隔符sep切分text，忽略括号内的sep
+        返回list
+        """
+        result = []
+        depth = 0
+        start = 0
+        for i, ch in enumerate(text):
+            if ch in '([{':
+                depth += 1
+            elif ch in ')]}':
+                depth -= 1
+            elif ch == sep and depth == 0:
+                result.append(text[start:i])
+                start = i + 1
+        result.append(text[start:])
+        return result
+
     
-    def _extract_module_name_and_parameters(self, content):
+    def _extract_module_name(self, content):
         """提取模块名和参数信息"""
         # 匹配模块定义行（支持带有参数的模块定义）
         module_pattern = r'module\s+(\w+)\s*(?:#\s*\(.*?\))?\s*\('
@@ -297,15 +375,21 @@ class VerilogPortParser:
     
     def _parse_port_declaration_line_non_ansi(self, direction, ports_text):
         """解析非ANSI风格的端口声明行"""
-        # 检查是否包含向量声明
-        vector_match = re.search(r'\[(\d+):(\d+)\]', ports_text)
+        # 检查是否包含向量声明（支持数字和字符串形式的位宽）
+        vector_match = re.search(r'\[(.*?):(.*?)\]', ports_text)
         width = {'high': 0, 'low': 0}
         
         if vector_match:
-            width['high'] = int(vector_match.group(1))
-            width['low'] = int(vector_match.group(2))
+            # 获取高位和低位值
+            high_value = vector_match.group(1).strip()
+            low_value = vector_match.group(2).strip()
+            
+            # 使用 _trans_bit_range_by_str() 函数转换高位和低位值
+            width['high'] = self._trans_bit_range_by_str(high_value)
+            width['low'] = self._trans_bit_range_by_str(low_value)
+            
             # 移除向量部分
-            ports_text = re.sub(r'\[(\d+):(\d+)\]', '', ports_text)
+            ports_text = re.sub(r'\[(.*?):(.*?)\]', '', ports_text)
         
         # 检查是否有reg/wire等类型声明
         type_match = re.search(r'\b(reg|wire|logic|signed|unsigned)\b', ports_text)
@@ -329,17 +413,66 @@ class VerilogPortParser:
                 port = VerilogPort(name=port_name, direction=direction, width=width)
                 self.ports.append(port)
     
+
+    def _trans_bit_range_by_str(self, high_or_low_str:str) -> int:
+        """将位宽字符串转换为位宽数值
+        支持简单的计算公式，公式中的变量值来自parameters
+        """
+        # 去除首尾空白字符
+        expr = high_or_low_str.strip()
+        
+        # 尝试直接转换为整数
+        try:
+            return int(expr)
+        except ValueError:
+            pass
+        
+        # 尝试处理简单的计算公式
+        try:
+            # 创建一个安全的局部变量字典，仅包含parameters中的值
+            local_vars = {}
+            for key, value in self.parameters.items():
+                try:
+                    local_vars[key] = int(value)
+                except (ValueError, TypeError):
+                    # 跳过无法转换为整数的参数值
+                    continue
+
+            # 检查表达式中是否只包含允许的字符和运算符
+            # 允许字母、数字、基本算术运算符、括号、空格和参数名
+            if re.match(r'^[a-zA-Z0-9_\s+\-*/()]+$', expr):
+                # 安全地计算表达式
+                result = eval(expr, {"__builtins__": {}}, local_vars)
+                return int(result)
+        except (SyntaxError, NameError, ZeroDivisionError, TypeError):
+            # 如果表达式解析失败，尝试直接查找参数
+            if expr in self.parameters:
+                try:
+                    return int(self.parameters[expr])
+                except (ValueError, TypeError):
+                    pass
+        
+        # 默认返回0
+        return 0
+
+
     def _parse_port_line_ansi(self, direction, port_line):
         """解析ANSI风格的端口行"""
-        # 检查是否有向量声明
-        vector_match = re.search(r'\[(\d+):(\d+)\]', port_line)
+        # 检查是否有向量声明（支持数字和字符串形式的位宽）
+        vector_match = re.search(r'\[(.*?):(.*?)\]', port_line)
         width = {'high': 0, 'low': 0}
         
         if vector_match:
-            width['high'] = int(vector_match.group(1))
-            width['low'] = int(vector_match.group(2))
+            # 获取高位和低位值
+            high_value = vector_match.group(1).strip()
+            low_value = vector_match.group(2).strip()
+            
+            # 使用 _trans_bit_range_by_str() 函数转换高位和低位值
+            width['high'] = self._trans_bit_range_by_str(high_value)
+            width['low'] = self._trans_bit_range_by_str(low_value)
+            
             # 移除向量部分
-            port_line = re.sub(r'\[(\d+):(\d+)\]', '', port_line)
+            port_line = re.sub(r'\[(.*?):(.*?)\]', '', port_line)
         
         # 移除signed/unsigned等关键字
         port_line = re.sub(r'\b(signed|unsigned)\b', '', port_line)
