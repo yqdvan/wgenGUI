@@ -1,0 +1,54 @@
+# wgen_GUI linux配置文件示例
+
+modules:
+  - module_name: simple_module
+    ins_name: u_simple
+    path: ./examples/
+  - module_name: param_module
+    ins_name: u_param_module
+    path: ./examples/
+  - module_name: complex_module
+    ins_name: u_complex
+    path: ./examples/
+  - module_name: axi4_fifo
+    ins_name: u_axi4_fifo
+    path: ./examples/
+
+generate_modules:
+  - module_name: soc_chip
+    path: ./examples/
+    ports:
+      - port_name: clk_i
+        port_type: input
+        port_bits: "0:0"
+      - port_name: rst_i
+        port_type: input
+        port_bits: "0:0"
+      - port_name: data_i
+        port_type: input
+        port_bits: "31:0"
+  - module_name: sublock
+    path: ./examples/
+    ports:
+      - port_name: clk1_i
+        port_type: input
+        port_bits: "0:0"
+      - port_name: rst1_i
+        port_type: input
+        port_bits: "0:0"
+      - port_name: data1_o
+        port_type: output
+        port_bits: "31:0"
+
+hierarchy_def:
+  - hierarchy: soc_chip
+    includes:
+      - u_simple
+      - u_simple
+      - u_param_module
+      - u_complex
+      - sublock
+  - hierarchy: sublock
+    includes:
+      - u_complex
+      - u_axi4_fifo
