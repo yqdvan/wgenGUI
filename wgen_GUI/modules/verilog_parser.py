@@ -45,7 +45,11 @@ class VerilogParser:
                 if 'modules' in config_data:
                     for module_info in config_data['modules']:
                         # 对于每个模块，解析其端口信息
-                        portParser =VerilogPortParser(module_info['path'])
+                        filePath = module_info['path']
+                        if not os.path.isfile(filePath):
+                            filePath = filePath+ "/" +module_info['module_name']+".v"
+                            
+                        portParser =VerilogPortParser(filePath)
                         ins_name = module_info.get('ins_name')
                         module_def_name = module_info.get('module_name')
 

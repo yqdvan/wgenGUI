@@ -432,7 +432,7 @@ class WGenGUI:
                 save_result = self._save_database()
                 show_str = f"已成功连接 {self.master_module.name}.{master_port} -> {self.slave_module.name}.{slave_port} \n{save_result}"
                 # messagebox.showinfo("成功", show_str)
-                Toast(self.root, show_str, duration=2000, position='top')
+                Toast(self.root, show_str, duration=2000, position='center')
                 self._update_master_display()
                 self._update_slave_display()
             except Exception as e:
@@ -444,21 +444,17 @@ class WGenGUI:
         """打开配置文件对话框"""
         file_path = self.file_handler.open_config_file_dialog()
         if file_path:
-            self._load_config_file(file_path)
-    
-    def _load_config_file(self, file_path):
-        """加载配置文件并更新界面"""
-        try:
-            modules = self.file_handler.load_config_file(file_path, self.parser)
-            if modules:
-                self.modules = modules
-                self._update_modules_list()
-                self._update_hierarchy_view()
-                show_str = f"配置文件已加载成功！！共包含 {len(modules)} 个模块"
-                Toast(self.root, show_str, duration=2000, position='top')
-                self._initialize_collection_DB()
-        except Exception as e:
-            messagebox.showerror("错误", f"加载配置文件失败: {str(e)}")
+            try:
+                modules = self.file_handler.load_config_file(file_path, self.parser)
+                if modules:
+                    self.modules = modules
+                    self._update_modules_list()
+                    self._update_hierarchy_view()
+                    show_str = f"配置文件已加载成功！！共包含 {len(modules)} 个模块"
+                    Toast(self.root, show_str, duration=2000, position='center')
+                    self._initialize_collection_DB()
+            except Exception as e:
+                messagebox.showerror("错误", f"加载配置文件失败: {str(e)}")
 
     def _initialize_collection_DB(self):
         """初始化模块集合数据库"""
@@ -487,7 +483,7 @@ class WGenGUI:
                 
                 # 显示加载成功信息
                 show_str = f"Database已从 {file_path} 加载成功！！"
-                Toast(self.root, show_str, duration=2000, position='top')
+                Toast(self.root, show_str, duration=2000, position='center')
 
                 # 直接使用VerilogModule对象，不再转换为结构体
                 self.modules = self.collection_DB.modules
@@ -515,7 +511,7 @@ class WGenGUI:
                     save_result = self._save_database(file_path, self.version)  
                     if save_result:
                         show_str = f"Database已成功保存到:\n{file_path}"
-                        Toast(self.root, show_str, duration=2000, position='top')
+                        Toast(self.root, show_str, duration=2000, position='center')
                         return save_result
                 else:
                     # 用户取消了保存操作
@@ -735,7 +731,7 @@ class WGenGUI:
                     if ans_str is None or ans_str == "":
                         save_result = self._save_database()
                         if save_result is not None and save_result != "":
-                            Toast(self.root, "删除连接成功\n" + save_result, duration=2000, position='top')
+                            Toast(self.root, "删除连接成功\n" + save_result, duration=2000, position='center')
                             print(f"成功删除主端口 {port_name} 的连接")
                         else:
                             save_result = "save failed!!!"
@@ -754,7 +750,7 @@ class WGenGUI:
                 if ans_str is None or ans_str == "":
                     save_result = self._save_database()
                     if save_result is not None and save_result != "":
-                        Toast(self.root, "删除连接成功\n" + save_result, duration=2000, position='top')
+                        Toast(self.root, "删除连接成功\n" + save_result, duration=2000, position='center')
                         print(f"成功删除从端口 {port_name} 的连接")
                     else:
                         save_result = "save failed!!!"
@@ -768,7 +764,7 @@ class WGenGUI:
 
         else:
             show_str = f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}"
-            Toast(self.root, show_str, duration=2000, position='top')
+            Toast(self.root, show_str, duration=2000, position='center')
 
         # # 根据操作类型显示不同的消息
         # if action == "optionA":

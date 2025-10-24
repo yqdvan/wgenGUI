@@ -68,15 +68,16 @@ class WgenConfigGenerator(CodeGeneratorInterface):
         instance_lines.append(f"# generated module instance")
         instance_lines.append(f"##########################################")
         for module in db.modules:
-            instance_lines.append(f"instance {module.name} \\")
-            instance_lines.append(f"  module {module.module_def_name} \\")
-            instance_lines.append(f"  library work \\")
-            instance_lines.append(f"  path {module.file_path} ")
-            # if have parameter
-            if module.parameters:
-                for par_name, par_value in module.parameters.items():
-                    instance_lines.append(f"  generic {par_name}  {par_value} in {module.name} ")
-            instance_lines.append(f"\n")
+            if not module.need_gen:
+                instance_lines.append(f"instance {module.name} \\")
+                instance_lines.append(f"  module {module.module_def_name} \\")
+                instance_lines.append(f"  library work \\")
+                instance_lines.append(f"  path {module.file_path}")
+                # if have parameter
+                if module.parameters:
+                    for par_name, par_value in module.parameters.items():
+                        instance_lines.append(f"    generic {par_name}  {par_value} in {module.name} ")
+                instance_lines.append(f"\n")
 
     # 拼接模块实例化代码成字符串
         result = "\n".join(instance_lines)
@@ -109,8 +110,10 @@ class WgenConfigGenerator(CodeGeneratorInterface):
         for module in db.modules:
             if module.need_gen:
                 module_def_lines.append(f"generate verilog {module.module_def_name}  \\")
+                module_def_lines.append(f"  library work \\")
                 module_def_lines.append(f"  port_order user \\")
-                module_def_lines.append(f"  path {module.file_path}  \\")
+                module_def_lines.append(f"  inst_name u_{module.module_def_name} \\")
+                module_def_lines.append(f"  path {module.file_path}")
                 module_def_lines.append(f" ")
 
         return "\n".join(module_def_lines)
