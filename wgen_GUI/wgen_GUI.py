@@ -75,17 +75,19 @@ class WGenGUI:
     
     def _show_startup_dialog(self):
         """显示启动选择对话框，使用tkinter内置的是/否按钮对话框"""
-        # 使用messagebox.askyesno显示是/否对话框
-        result = messagebox.askyesno(
+        # 使用messagebox.askyesnocancel显示是/否/取消对话框
+        result = messagebox.askyesnocancel(
             title=f"wgen_GUI {self.version} 启动选择",
             message="是否继续上一次工作？\n\n“是”：选择您保存的database，“否”：打开配置文件初始化数据库"
         )
         
         # 根据用户的选择执行相应操作
-        if result:  # 用户选择"是"
+        if result is True:  # 用户选择"是"
             self._open_database()
-        else:  # 用户选择"否"或关闭对话框
+        elif result is False:  # 用户选择"否"
             self._open_config_file()
+        else:  # 用户选择"取消"或关闭对话框
+            print("用户选择了取消或关闭对话框")
     
     def _create_layout(self):
         """创建GUI布局

@@ -211,7 +211,7 @@ class WgenConfigGenerator(CodeGeneratorInterface):
                 src_port_range_str = f"({connection.source_bit_range['high']}:{connection.source_bit_range['low']})" 
                 dst_port_range_str = f"({connection.dest_bit_range['high']}:{connection.dest_bit_range['low']})" 
 
-            connection_lines.append(f"from {connection.source_module_name}.{connection.source_port.name}{src_port_range_str} to {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str}")
+            connection_lines.append(f"from {connection.source_module_name}.{connection.source_port.name}{src_port_range_str} to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
         connection_lines.append(f" ")
         
         return "\n".join(connection_lines)
