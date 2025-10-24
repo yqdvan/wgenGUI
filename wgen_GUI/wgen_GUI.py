@@ -20,7 +20,17 @@ class WGenGUI:
 
         style = ttk.Style()
         style.theme_use('clam')  # 使用clam主题
-
+        
+        # 设置软件图标
+        try:
+            import os
+            # 获取图标文件的绝对路径
+            icon_path = os.path.join(os.path.dirname(__file__), "icon.ico")
+            print(icon_path)
+            icon = tk.PhotoImage(file=icon_path)
+            self.root.iconphoto(True, icon)
+        except Exception as e:
+            print(f"无法加载图标: {e}")
 
         self.root.geometry("1200x800")
 
@@ -1051,25 +1061,37 @@ if __name__ == "__main__":
     from splash_screen import SplashScreen
     # 显示启动窗口
     splash_root = tk.Tk()
+    # 设置启动窗口图标
+    try:
+        # 获取图标文件的绝对路径
+        icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+        icon = tk.PhotoImage(file=icon_path)
+        splash_root.iconphoto(True, icon)
+    except Exception as e:
+        print(f"无法加载图标: {e}")
+    
     splash = SplashScreen(splash_root, WGenGUI.version)
     splash_root.update()
     
+    splash.update_loading_text(f"python版本: {sys.version}")
+    sleep(0.6)
+
     # 检查是否安装了yaml库
     try:
         # 添加lib目录到Python路径
         sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
         import yaml
         splash.update_loading_text("导入yaml库...   成功")
-        sleep(0.5)
+        sleep(0.4)
         splash.update_loading_text(f"yaml版本: {yaml.__version__}")
-        sleep(0.5)        
+        sleep(0.4)        
         
         # 更新加载信息
         splash.update_loading_text(f"初始化配置... (tk版本: {tk.TkVersion})")
-        sleep(0.5)
+        sleep(0.4)
 
         splash.update_loading_text(f"wgen_GUI版本: {WGenGUI.version}")
-        sleep(0.5)        
+        sleep(0.4)        
         
     except ImportError:
         # 更新加载信息
@@ -1095,11 +1117,20 @@ if __name__ == "__main__":
         splash_root.destroy()
         # 创建主应用
         root = tk.Tk()
+        # 设置主应用窗口图标
+        try:
+            # 获取图标文件的绝对路径
+            icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+            icon = tk.PhotoImage(file=icon_path)
+            root.iconphoto(True, icon)
+        except Exception as e:
+            print(f"无法加载图标: {e}")
+        
         app = WGenGUI(root)
         root.mainloop()
     
     # 1秒后执行关闭函数
-    splash_root.after(600, close_splash)  # 1000毫秒 = 1秒
+    splash_root.after(500, close_splash)  # 1000毫秒 = 1秒
     
     # 启动启动窗口的主循环
     splash_root.mainloop()
