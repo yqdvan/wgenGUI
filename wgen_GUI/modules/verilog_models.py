@@ -165,25 +165,57 @@ class VerilogModule:
         return None
     
     def __str__(self):
-        """返回模块的字符串表示"""
-        result = f"module {self.name}(\n"
+        """返回模块的字符串表示，用于日志记录"""
+        result = [f"=== Verilog Module: {self.name} ==="]
         
-        # 获取所有端口名称
-        port_names = [port.name for port in self.ports]
+        # 基本信息
+        result.append(f"  Instance Name: {self.name}")
+        if self.file_path:
+            result.append(f"  File Path: {self.file_path}")
+        if self.module_def_name:
+            result.append(f"  Module Definition Name: {self.module_def_name}")
+        result.append(f"  Need Generate: {self.need_gen}")
         
-        # 格式化端口列表
-        if port_names:
-            result += f"  {', '.join(port_names)}"
+        # 参数信息
+        if self.parameters:
+            result.append("\n  Parameters:")
+            for param_name, param_value in self.parameters.items():
+                result.append(f"    {param_name}: {param_value}")
+        else:
+            result.append("\n  Parameters: None")
         
-        result += "\n);\n\n"
+        # 端口信息
+        if self.ports:
+            # 统计各类端口的数量
+            input_count = len(self.get_input_ports())
+            output_count = len(self.get_output_ports())
+            inout_count = len(self.get_inout_ports())
+            
+            result.append(f"\n  Ports Summary:")
+            result.append(f"    Input Ports: {input_count}")
+            result.append(f"    Output Ports: {output_count}")
+            result.append(f"    Inout Ports: {inout_count}")
+            result.append(f"    Total Ports: {len(self.ports)}")
+        else:
+            result.append("\n  Ports: None")
         
-        # 添加端口声明
-        for port in self.ports:
-            result += f"  {port}\n"
+        # 包含关系
+        if self.includes:
+            result.append("\n  Included Modules:")
+            for included_module in self.includes:
+                result.append(f"    {included_module.name}")
+        else:
+            result.append("\n  Included Modules: None")
         
-        result += "\nendmodule"
+        # 顶级模块信息
+        if self.top_module:
+            result.append(f"\n  Top Module: {self.top_module.name}")
+        else:
+            result.append("\n  Top Module: None")
         
-        return result
+        result.append("=" * (len(f"=== Verilog Module: {self.name} ===") + 1))
+        
+        return "\n".join(result)
     
     def get_connections_summary(self):
         """获取连接摘要信息"""

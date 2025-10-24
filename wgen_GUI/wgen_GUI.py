@@ -184,6 +184,8 @@ class WGenGUI:
         self.module_menu = tk.Menu(self.root, tearoff=0)
         self.module_menu.add_command(label="设为Master", command=self._set_as_master)
         self.module_menu.add_command(label="设为Slave", command=self._set_as_slave)
+        self.module_menu.add_separator()
+        self.module_menu.add_command(label="属性", command=self._show_module_properties)
         
     def _create_right_panel(self):
         """创建右侧面板内容
@@ -568,6 +570,20 @@ class WGenGUI:
             # 显示右键菜单
             self.module_menu.post(event.x_root, event.y_root)
     
+    def _show_module_properties(self):
+        """显示选中模块的属性"""
+        selected_item = self.modules_tree.selection()
+        if selected_item:
+            module_name = self.modules_tree.item(selected_item[0])['values'][0]
+            
+            # 查找对应的模块
+            for module in self.modules:
+                if module.name == module_name:
+                    # 构建属性信息
+                    properties = module.__str__()
+                    messagebox.showinfo("模块属性", properties)
+                    break
+
     def _set_as_master(self):
         """将选中的模块设为Master"""
         selected_item = self.modules_tree.selection()

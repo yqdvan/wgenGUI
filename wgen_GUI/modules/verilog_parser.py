@@ -64,11 +64,31 @@ class VerilogParser:
                         # 添加到模块列表
                         modules_ans.append(module_obj)
                 
-                # generate_modules:
-                #   - module_name: soc_chip
-                #     path: ./examples/soc_chip.v
-                #   - module_name: sublock
-                #     path: ./examples/sublock.v                    
+                        # generate_modules:
+                        #   - module_name: soc_chip
+                        #     path: ./examples/
+                        #     ports:
+                            #     - port_name: clk_i
+                            #     port_type: input
+                            #     port_bits: "0:0"
+                            #     - port_name: rst_i
+                            #     port_type: input
+                            #     port_bits: "0:0"
+                            #     - port_name: data_i
+                            #     port_type: input
+                            #     port_bits: "31:0"
+                            # - module_name: sublock
+                            # path: ./examples/
+                            # ports:
+                            #     - port_name: clk1_i
+                            #     port_type: input
+                            #     port_bits: "0:0"
+                            #     - port_name: rst1_i
+                            #     port_type: input
+                            #     port_bits: "0:0"
+                            #     - port_name: data1_i
+                            #     port_type: input
+                            #     port_bits: "31:0"             
                 # 解析generate_modules部分
                 if 'generate_modules' in config_data:
 
@@ -85,6 +105,39 @@ class VerilogParser:
                         )
 
                         module_obj.need_gen = True 
+                        
+                        # 解析ports信息并创建VerilogPort对象
+                        if 'ports' in gen_module_info:
+                            for port_info in gen_module_info['ports']:
+                                port_name = port_info['port_name']
+                                port_type = port_info['port_type']
+                                
+                                # 解析端口位宽
+                                port_bits = port_info['port_bits']
+                                # 处理port_bits可能的不同格式
+                                if isinstance(port_bits, list) and len(port_bits) == 1:
+                                    # 格式: ['31:0']
+                                    width_str = port_bits[0].split(':')
+                                else:
+                                    # 格式: [31:0]
+                                    width_str = str(port_bits).strip('[]').split(':')
+                                
+                                width = {
+                                    'high': int(width_str[0]),
+                                    'low': int(width_str[1])
+                                }
+                                
+                                # 创建VerilogPort对象
+                                port_obj = VerilogPort(
+                                    name=port_name,
+                                    direction=port_type,
+                                    width=width,
+                                    father_module=module_obj
+                                )
+                                
+                                # 添加端口到模块的ports列表
+                                module_obj.ports.append(port_obj)
+                        
                         modules_ans.append(module_obj)
 
                 # hierarchy_def:
