@@ -114,7 +114,7 @@ class WgenConfigGenerator(CodeGeneratorInterface):
                 module_def_lines.append(f"  port_order user \\")
                 module_def_lines.append(f"  inst_name u_{module.module_def_name} \\")
                 module_def_lines.append(f"  path {module.file_path}")
-                module_def_lines.append(f" ")
+                module_def_lines.append(f"")
 
         return "\n".join(module_def_lines)
 
@@ -147,7 +147,7 @@ class WgenConfigGenerator(CodeGeneratorInterface):
                 for include_md in module.includes:
                     hierarchy_def += f"{include_md.module_def_name} "
                 hierarchy_lines.append(hierarchy_def)
-                hierarchy_lines.append(f" ")
+                hierarchy_lines.append(f"")
 
         return "\n".join(hierarchy_lines)
 
@@ -181,7 +181,7 @@ class WgenConfigGenerator(CodeGeneratorInterface):
                     pin_or_bus = "pin" if port.get_width_value() == 1 else "bus"
                     port_range_str = f"({port.width['high']}:{port.width['low']})" if port.get_width_value() > 1 else ""
                     port_def_lines.append(f"{pin_or_bus}  {port.direction} {module.name}.{port.name} {port_range_str}")
-                port_def_lines.append(f" ")
+                port_def_lines.append(f"")
 
         return "\n".join(port_def_lines)
 
