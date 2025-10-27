@@ -280,12 +280,14 @@ class WGenGUI:
         # 绑定右键菜单事件
         self.slave_ports_tree.bind("<Button-3>", self._show_port_context_menu)
         # # # 绑定双击事件，用于显示端口信息
-        # self.slave_ports_tree.bind("<Double-1>", lambda event: self._on_port_double_click(self.slave_ports_tree, event))
+        self.slave_ports_tree.bind("<Double-1>", lambda event: self._on_port_double_click(self.slave_ports_tree, event))
         
         # 创建端口右键菜单
         self.port_menu = tk.Menu(self.root, tearoff=0)
         self.port_menu.add_command(label="断开连接", command=lambda: self._port_menu_action("optionA", self.current_tree))
         self.port_menu.add_command(label="optionB", command=lambda: self._port_menu_action("optionB", self.current_tree))
+        self.port_menu.add_separator()
+        self.port_menu.add_command(label="属性", command=lambda: self._port_menu_action("optionC", self.current_tree))
         
         # Slave下方 - 电路示意图
         slave_schematic_frame = ttk.LabelFrame(slave_paned, text="Slave电路示意图")
@@ -302,7 +304,6 @@ class WGenGUI:
         # Linux鼠标滚轮事件
         self.slave_canvas.bind("<Button-4>", lambda event: self._on_mousewheel(event, "slave"))
         self.slave_canvas.bind("<Button-5>", lambda event: self._on_mousewheel(event, "slave"))
-    
     
     def _create_menu(self):
         """创建菜单栏"""
@@ -368,8 +369,6 @@ class WGenGUI:
             Toast("用户取消了保存操作")
             pass
         
-
-
     def _try_update_database(self):
         """增量更新Database按钮的响应函数"""
         # 弹出确认对话框
@@ -378,8 +377,6 @@ class WGenGUI:
         # 增量更新数据库
         messagebox.showinfo("Info", "正在开发，敬请期待！")
         
-
-
     def _create_connection(self):
         """创建连接按钮的响应函数，显示选中的master和slave端口"""
         # 获取master端口列表中选中的端口
@@ -547,7 +544,6 @@ class WGenGUI:
             messagebox.showwarning("警告", "没有可保存的Database")
             return ""
 
-    
     def _update_modules_list(self):
         """更新模块列表显示"""
         # 清空现有列表
@@ -616,21 +612,24 @@ class WGenGUI:
     
     def _on_port_double_click(self, tree, event):
         """处理Master端口Treeview的双击事件"""
+        is_master:bool = tree == self.master_ports_tree
         item = tree.identify_row(event.y)
-        port_name = self.master_ports_tree.item(item)['values'][0]
-        # 查找对应的端口
-        selected_master_port = None
-        for port in self.master_module.ports:
-            if port.name == port_name:
-                selected_master_port = port
-                break
+        port_name = self.master_ports_tree.item(item)['values'][0] if is_master else self.slave_ports_tree.item(item)['values'][0]
         
-        if isinstance(selected_master_port, VerilogPort):
+        # 查找对应的端口
+        query_ports = self.master_module.ports if is_master else self.slave_module.ports
+        selected_port = None
+        for port in query_ports:
+            if port.name == port_name:
+                selected_port = port
+                break
+
+        if isinstance(selected_port, VerilogPort):
             # 显示端口详细信息
             top = tk.Toplevel()
             top.title("端口详细信息")
             text = tk.Text(top, wrap=tk.WORD)
-            text.insert(tk.END, str(selected_master_port))
+            text.insert(tk.END, str(selected_port))
             text.pack(fill=tk.BOTH, expand=True)
             text.configure(state=tk.DISABLED)
             button = ttk.Button(top, text="确定", command=top.destroy)
@@ -638,7 +637,6 @@ class WGenGUI:
         else:
             messagebox.showwarning("警告", f"未找到端口 {port_name}")
         
-
     def _update_master_display(self):
         """更新Master相关显示"""
         if self.master_module:
@@ -662,7 +660,7 @@ class WGenGUI:
                             # connect_show = "\n".join([f"{dest.father_module.name} -> {dest.name}" for dest in port.destinations])
                             connect_show = port.destinations[0].father_module.name + "." + port.destinations[0].name + "...(" + str(len(port.destinations)) + " more lines)"
                         else:
-                            connect_show = port.destinations[0].name
+                            connect_show = port.destinations[0].father_module.name + "." + port.destinations[0].name
                     self.master_ports_tree.insert('', tk.END, values=(port.name,width_show, connect_show), open=True)
                 else:
                     messagebox.showerror("错误", f"端口 {port.name} 不是 VerilogPort 类型")
@@ -765,6 +763,8 @@ class WGenGUI:
             self._update_master_display()
             self._update_slave_display()
 
+        elif tree_type == "master" and action == "optionC":
+            messagebox.showinfo("操作提示", f"正在开发，敬请期待！")
         elif tree_type == "slave" and action == "optionA":  
             port_obj = self.slave_module.get_port(port_name)
             if port_obj:
@@ -810,6 +810,9 @@ class WGenGUI:
         except:
             # 如果获取失败，使用默认的浅灰色
             fill_color = "#f0f0f0"
+
+        if module.need_gen:
+            fill_color = "#90EE90"
 
         # 获取画布尺寸
         width = canvas.winfo_width()
@@ -870,6 +873,8 @@ class WGenGUI:
                 y_pos = y1 + 30 + port_spacing * i
                 # 根据端口是否有source设置颜色：有source用绿色，无source用红色
                 line_color = "green" if port.source is not None else "red"
+                if module.need_gen:
+                    line_color = "green" if port.source is not None or port.destinations else "red"
                 # 绘制端口线
                 canvas.create_line(x1 - 20, y_pos, x1, y_pos, width=2, fill=line_color)
                 # 绘制端口名称，使用VerilogPort对象的name属性
@@ -882,6 +887,8 @@ class WGenGUI:
                 y_pos = y1 + 30 + port_spacing * i
                 # 根据端口的destinations是否为空设置颜色：有目标端口用绿色，无目标端口用红色
                 line_color = "green" if port.destinations else "red"
+                if module.need_gen:
+                    line_color = "green" if port.source is not None or port.destinations else "red"
                 # 绘制端口线
                 canvas.create_line(x2, y_pos, x2 + 20, y_pos, width=2, fill=line_color)
                 # 绘制端口名称，使用VerilogPort对象的name属性

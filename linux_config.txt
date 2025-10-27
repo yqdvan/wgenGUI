@@ -27,6 +27,9 @@ generate_modules:
       - port_name: data_i
         port_type: input
         port_bits: "31:0"
+      - port_name: data_o
+        port_type: output
+        port_bits: "31:0"        
   - module_name: sublock
     path: ./examples/
     ports:

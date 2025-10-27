@@ -35,8 +35,8 @@ class VerilogPort:
         
         # 构建源和目的地信息
         source_info = '\nsource_info:\n'
-        dest_info = 'destination_info:\n'
-        
+        dest_info = '\ndestination_info:\n'
+
         if not self.father_module.need_gen:
             if self.direction in ['input', 'inout'] and self.source:
                 source_module = self.source.father_module if self.source.father_module is None else self.source.father_module
@@ -508,14 +508,14 @@ class VerilogModuleCollection:
         
         # 更新端口的源和目的地信息
         # 源端口是输出端口或双向端口
-        if source_port.is_output() or source_port.is_inout():
+        # if source_port.is_output() or source_port.is_inout():
             # 将目标端口添加到源端口的destinations列表中
-            if dest_port not in source_port.destinations:
-                source_port.destinations.append(dest_port)
+        if dest_port not in source_port.destinations:
+            source_port.destinations.append(dest_port)
         
         # 目标端口是输入端口或双向端口
-        if dest_port.is_input() or dest_port.is_inout():
-            dest_port.source = source_port
+        # if dest_port.is_input() or dest_port.is_inout():
+        dest_port.source = source_port
     
 
     def remove_master_port_connections(self, master_port: VerilogPort):
