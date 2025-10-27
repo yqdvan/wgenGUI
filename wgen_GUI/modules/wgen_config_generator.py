@@ -7,6 +7,7 @@ except ImportError:
     from verilog_models import VerilogModuleCollection, VerilogModule, VerilogPort, VerilogConnection
 from datetime import datetime
 import getpass
+import os
 
 
 class WgenConfigGenerator(CodeGeneratorInterface):
@@ -72,7 +73,11 @@ class WgenConfigGenerator(CodeGeneratorInterface):
                 instance_lines.append(f"instance {module.name} \\")
                 instance_lines.append(f"  module {module.module_def_name} \\")
                 instance_lines.append(f"  library work \\")
-                instance_lines.append(f"  path {module.file_path}")
+                if os.path.isfile(module.file_path):
+                    dir_path = os.path.dirname(module.file_path)
+                    instance_lines.append(f"  path {dir_path}")
+                else:
+                    instance_lines.append(f"  path {module.file_path}")
                 # if have parameter
                 if module.parameters:
                     for par_name, par_value in module.parameters.items():
@@ -145,7 +150,7 @@ class WgenConfigGenerator(CodeGeneratorInterface):
             if module.need_gen:
                 hierarchy_def = f"hierarchy {module.module_def_name} = "
                 for include_md in module.includes:
-                    hierarchy_def += f"{include_md.module_def_name} "
+                    hierarchy_def += f"{include_md.name} "
                 hierarchy_lines.append(hierarchy_def)
                 hierarchy_lines.append(f"")
 
@@ -180,7 +185,14 @@ class WgenConfigGenerator(CodeGeneratorInterface):
                 for port in module.ports:
                     pin_or_bus = "pin" if port.get_width_value() == 1 else "bus"
                     port_range_str = f"({port.width['high']}:{port.width['low']})" if port.get_width_value() > 1 else ""
-                    port_def_lines.append(f"{pin_or_bus}  {port.direction} {module.name}.{port.name} {port_range_str}")
+                    port_dir = ""
+                    if port.direction == "input":
+                        port_dir = "in"
+                    elif port.direction == "output":
+                        port_dir = "out"
+                    elif port.direction == "inout": 
+                        port_dir = "inout"
+                    port_def_lines.append(f"{pin_or_bus}  {port_dir} {module.name}.{port.name} {port_range_str}")
                 port_def_lines.append(f"")
 
         return "\n".join(port_def_lines)

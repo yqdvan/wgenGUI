@@ -34,17 +34,29 @@ class VerilogPort:
             width_str = f"[{self.width['high']}:{self.width['low']}]"
         
         # 构建源和目的地信息
-        source_info = ''
-        if self.direction in ['input', 'inout'] and self.source:
-            source_module = self.source.father_module if self.source.father_module is None else self.source.father_module
-            source_info += f" (source: {source_module.name}.{self.source.name if self.source else 'None'})"
+        source_info = '\nsource_info:\n'
+        dest_info = 'destination_info:\n'
         
-        dest_info = ''
-        if self.direction in ['output', 'inout'] and self.destinations:
-            dest_info += "port loads:\n"
-            for dest_port in self.destinations:
-                dest_module = dest_port.father_module if dest_port.father_module is None else dest_port.father_module
-                dest_info += f"    {dest_module.name}.{dest_port.name}\n"
+        if not self.father_module.need_gen:
+            if self.direction in ['input', 'inout'] and self.source:
+                source_module = self.source.father_module if self.source.father_module is None else self.source.father_module
+                source_info += f" (source: {source_module.name}.{self.source.name if self.source else 'None'})"
+            
+            if self.direction in ['output', 'inout'] and self.destinations:
+                dest_info += "port loads:\n"
+                for dest_port in self.destinations:
+                    dest_module = dest_port.father_module if dest_port.father_module is None else dest_port.father_module
+                    dest_info += f"    {dest_module.name}.{dest_port.name}\n"
+        else: # need gen
+            
+            if self.source:
+                source_module = self.source.father_module if self.source.father_module is None else self.source.father_module
+                source_info += f" (source: {source_module.name}.{self.source.name if self.source else 'None'})"
+           
+            if self.destinations:
+                for dest_port in self.destinations:
+                    dest_module = dest_port.father_module if dest_port.father_module is None else dest_port.father_module
+                    dest_info += f"    {dest_module.name}.{dest_port.name}\n"            
 
         return f"father md: {self.father_module.name}\nport type: {self.direction}\nport name: {self.name}{width_str}\n{source_info}\n{dest_info}"
 
@@ -273,10 +285,15 @@ class VerilogConnection:
         # self.dest_module = dest_module
             
         # 验证端口方向是否兼容
-        if not (source_port.is_output() or source_port.is_inout()):
-            raise ValueError(f"源端口 '{source_port.name}' 必须是输出或双向端口")
-        if not (dest_port.is_input() or dest_port.is_inout()):
-            raise ValueError(f"目标端口 '{dest_port.name}' 必须是输入或双向端口")
+        if not source_port.father_module.need_gen :
+            if not (source_port.is_output() or source_port.is_inout()):
+                raise ValueError(f"源端口 '{source_port.name}' 必须是输出或双向端口")
+        if not dest_port.father_module.need_gen :
+            if not (dest_port.is_input() or dest_port.is_inout()):
+                raise ValueError(f"目标端口 '{dest_port.name}' 必须是输入或双向端口")
+            if dest_port.source:
+                raise ValueError(f"目标端口 '{dest_port.name}' 已连接到源端口 '{dest_port.source.name}'")
+                # dest_port.source = None
         
         self.source_port = source_port
         self.dest_port = dest_port

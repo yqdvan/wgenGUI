@@ -620,7 +620,7 @@ class WGenGUI:
         port_name = self.master_ports_tree.item(item)['values'][0]
         # 查找对应的端口
         selected_master_port = None
-        for port in self.master_module.get_output_ports():
+        for port in self.master_module.ports:
             if port.name == port_name:
                 selected_master_port = port
                 break
@@ -649,7 +649,10 @@ class WGenGUI:
             
             # 添加端口信息，默认连接状态为否
             # 使用VerilogModule对象的方法获取端口，并从VerilogPort对象获取名称
-            for port in self.master_module.get_output_ports():
+            show_ports = self.master_module.get_output_ports()
+            if self.master_module.need_gen:
+                show_ports.extend(self.master_module.get_input_ports())
+            for port in show_ports:
                 if isinstance(port, VerilogPort):
                     width_show = "[" +str(port.width['high']) +":"+ str(port.width['low']) + "]"
                     connect_show = "None"
@@ -677,7 +680,10 @@ class WGenGUI:
             
             # 添加端口信息，默认连接状态为否
             # 使用VerilogModule对象的方法获取端口，并从VerilogPort对象获取名称
-            for port in self.slave_module.get_input_ports():
+            show_ports = self.slave_module.get_input_ports()
+            if self.slave_module.need_gen:
+                show_ports.extend(self.slave_module.get_output_ports())
+            for port in show_ports:
                 if isinstance(port, VerilogPort):
                     width_show = "[" +str(port.width['high']) +":"+ str(port.width['low']) + "]"
                     connect_show = "None"
@@ -1094,16 +1100,16 @@ if __name__ == "__main__":
         sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
         import yaml
         splash.update_loading_text("导入yaml库...   成功")
-        sleep(0.4)
+        sleep(0.2)
         splash.update_loading_text(f"yaml版本: {yaml.__version__}")
-        sleep(0.4)        
+        sleep(0.2)        
         
         # 更新加载信息
         splash.update_loading_text(f"初始化配置... (tk版本: {tk.TkVersion})")
-        sleep(0.4)
+        sleep(0.2)
 
         splash.update_loading_text(f"wgen_GUI版本: {WGenGUI.version}")
-        sleep(0.4)        
+        sleep(0.2)        
         
     except ImportError:
         # 更新加载信息
