@@ -577,7 +577,15 @@ class WGenGUI:
                 if module.name == module_name:
                     # 构建属性信息
                     properties = module.__str__()
-                    messagebox.showinfo("模块属性", properties)
+                    # messagebox.showinfo("模块属性", properties)
+                    top = tk.Toplevel()
+                    top.title("模块属性")
+                    text = tk.Text(top, wrap=tk.WORD)
+                    text.insert(tk.END, properties)
+                    text.pack(fill=tk.BOTH, expand=True)
+                    text.configure(state=tk.DISABLED)
+                    button = ttk.Button(top, text="确定", command=top.destroy)
+                    button.pack(pady=5)                    
                     break
 
     def _set_as_master(self):
@@ -809,10 +817,10 @@ class WGenGUI:
             fill_color = style.lookup("Frame", "background")
         except:
             # 如果获取失败，使用默认的浅灰色
-            fill_color = "#f0f0f0"
-
+            fill_color = "#1abc9c"
+        fill_color = "#1abc9c"
         if module.need_gen:
-            fill_color = "#90EE90"
+            fill_color = "#3498db"
 
         # 获取画布尺寸
         width = canvas.winfo_width()
@@ -863,7 +871,10 @@ class WGenGUI:
         canvas.create_rectangle(x1, y1, x2, y2, outline="black", width=2, fill=fill_color)
         
         # 绘制模块名称，使用VerilogModule对象的name属性
-        text_show = "\n"+module.name + "\n (" + module.module_def_name + ")"
+        if module.need_gen:
+            text_show = "\n"+module.name + "\n (Need to generate)"
+        else:
+            text_show = "\n"+module.name + "\n (" + module.module_def_name + ")"
         canvas.create_text((x1 + x2) // 2, y1 + 15, text=text_show, font=("Arial", 12, "bold"))
         
         # 绘制输入端口，从VerilogPort对象获取名称
