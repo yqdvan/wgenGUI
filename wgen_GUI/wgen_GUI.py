@@ -1,6 +1,6 @@
 from time import sleep
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog, filedialog
+from tkinter import ttk, messagebox, simpledialog, filedialog, scrolledtext
 import copy
 from collections import deque
 from modules.verilog_parser import VerilogParser
@@ -12,7 +12,7 @@ from tkinter import ttk
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
-    version = "0.1.0"
+    version = "1.0.0"
     def __init__(self, root):
         """初始化GUI界面"""
         self.root = root
@@ -375,7 +375,29 @@ class WGenGUI:
         messagebox.showwarning("Warning", "敏感操作，可能毁坏现有数据库，更新前务必保存当前数据库！")
 
         # 增量更新数据库
-        messagebox.showinfo("Info", "正在开发，敬请期待！")
+        try:
+            # 打开file dialog, 选择YAML config文件
+            file_path = filedialog.askopenfilename(
+                title="选择YAML config文件",
+                filetypes=[("YAML config文件", "*.yaml"), ("所有文件", "*.*")]
+            )
+            if not file_path:
+                messagebox.showwarning("Warning", "未选择YAML config文件！")
+                return
+            # 增量更新数据库
+            modules:VerilogModule = self.file_handler.load_config_file(file_path, self.parser)
+            ans_str = self.collection_DB.update_module(modules)
+            
+            # 使用可滚动文本框显示详细信息
+            self._show_scolledtext(ans_str, "数据库增量更新Log")
+            
+            # save database
+            save_result = self._save_database()
+            Toast(self.root, save_result, duration=2000, position='center')
+            self._update_master_display()
+            self._update_slave_display()
+        except Exception as e:
+            messagebox.showerror("错误", f"增量更新数据库时发生错误: {str(e)}")
         
     def _create_connection(self):
         """创建连接按钮的响应函数，显示选中的master和slave端口"""
@@ -634,14 +656,15 @@ class WGenGUI:
 
         if isinstance(selected_port, VerilogPort):
             # 显示端口详细信息
-            top = tk.Toplevel()
-            top.title("端口详细信息")
-            text = tk.Text(top, wrap=tk.WORD)
-            text.insert(tk.END, str(selected_port))
-            text.pack(fill=tk.BOTH, expand=True)
-            text.configure(state=tk.DISABLED)
-            button = ttk.Button(top, text="确定", command=top.destroy)
-            button.pack(pady=5)
+            # top = tk.Toplevel()
+            # top.title("端口详细信息")
+            # text = tk.Text(top, wrap=tk.WORD)
+            # text.insert(tk.END, str(selected_port))
+            # text.pack(fill=tk.BOTH, expand=True)
+            # text.configure(state=tk.DISABLED)
+            # button = ttk.Button(top, text="确定", command=top.destroy)
+            # button.pack(pady=5)
+            self._show_scolledtext(str(selected_port), "端口详细信息")
         else:
             messagebox.showwarning("警告", f"未找到端口 {port_name}")
         
@@ -818,9 +841,9 @@ class WGenGUI:
         except:
             # 如果获取失败，使用默认的浅灰色
             fill_color = "#1abc9c"
-        fill_color = "#1abc9c"
+        fill_color = "#8aa9c4"
         if module.need_gen:
-            fill_color = "#3498db"
+            fill_color = "#99CCFF"
 
         # 获取画布尺寸
         width = canvas.winfo_width()
@@ -920,8 +943,8 @@ class WGenGUI:
             
     def _on_drag_motion(self, event, canvas_type):
         """拖动画布时的移动事件"""
-        print("\n拖动画布时的移动事件")
-        print("当前事件:", event)
+        # print("\n拖动画布时的移动事件")
+        # print("当前事件:", event)
         if self.is_dragging:
             # 计算鼠标移动的距离
             dx = event.x - self.last_x
@@ -954,8 +977,8 @@ class WGenGUI:
     def _on_mousewheel(self, event, canvas_type):
         """处理鼠标滚轮事件，实现缩放功能（跨平台兼容）"""
         # 检查当前画布是否被选中
-        print("\n处理鼠标滚轮事件，实现缩放功能")
-        print("当前事件:", event)
+        # print("\n处理鼠标滚轮事件，实现缩放功能")
+        # print("当前事件:", event)
         if (canvas_type == "master" and self.selected_canvas == self.master_canvas) or \
            (canvas_type == "slave" and self.selected_canvas == self.slave_canvas):
             # 跨平台滚动方向判断
@@ -964,11 +987,11 @@ class WGenGUI:
 
             if hasattr(event, 'num') and event.num in [4, 5]:
                 # Linux平台
-                print("Linux平台鼠标滚轮事件，event.num =", event.num)
+                # print("Linux平台鼠标滚轮事件，event.num =", event.num)
                 zoom_factor = 1.1 if event.num == 4 else 0.9
             elif hasattr(event, 'delta'):
                 # Windows平台
-                print("Windows平台鼠标滚轮事件，event.delta =", event.delta)
+                # print("Windows平台鼠标滚轮事件，event.delta =", event.delta)
                 delta = event.delta
                 zoom_factor = 1.1 if delta > 0 else 0.9
 
@@ -1063,7 +1086,50 @@ class WGenGUI:
                 module_text += f"\n{include_text}"
         
         return module_text
+
+    def _show_scolledtext(self, text: str, title: str = "showText"):
+        """显示可滚动的文本框，用于展示详细信息"""
+        print("\n显示可滚动的文本框，用于展示详细信息")
+        print("文本内容:", text)
+        result_window = tk.Toplevel(self.root)
+        # 先隐藏窗口，避免闪烁
+        result_window.withdraw()
         
+        result_window.title(title)
+        result_window.geometry("600x400")
+        result_window.resizable(True, True)
+        
+        # 创建标题标签
+        title_label = tk.Label(result_window, text=title, font=("SimHei", 12, "bold"))
+        title_label.pack(pady=10, padx=10, anchor="w")
+        
+        # 创建可滚动文本框
+        text_area = scrolledtext.ScrolledText(result_window, wrap=tk.WORD, width=70, height=15, font=("SimHei", 10))
+        text_area.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+        text_area.insert(tk.END, text)
+        text_area.config(state=tk.DISABLED)  # 设置为只读
+        
+        # 添加关闭按钮
+        close_button = tk.Button(result_window, text="关闭", command=result_window.destroy, width=15)
+        close_button.pack(pady=10)
+        
+        # 设置窗口居中（使用直接计算的方式，避免update_idletasks导致的闪烁）
+        # 计算屏幕中心位置
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - 600) // 2
+        y = (screen_height - 400) // 2
+        result_window.geometry(f"600x400+{x}+{y}")
+        
+        # 设置窗口为模态
+        result_window.transient(self.root)
+        result_window.grab_set()
+        
+        # 所有组件创建完成后显示窗口
+        result_window.deiconify()
+        
+        self.root.wait_window(result_window)
+
     def _show_about_info(self):
         """显示关于信息对话框
         

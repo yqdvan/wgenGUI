@@ -19,10 +19,11 @@ module param_module #(
     input                     write_en,
     input                     read_en,
     input      [ADDR_WIDTH-1:0] addr,
-    input      [DATA_WIDTH-1:0] data_in,
+    input      [100-1:0] data_in,
     
     // 输出端口
     output reg [DATA_WIDTH-1:0] data_out,
+    output reg [DATA_WIDTH-1:0] add1_out,
     output reg                 ready
 );
     

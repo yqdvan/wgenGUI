@@ -25,7 +25,7 @@ class FileHandler:
         """
         file_path = filedialog.askopenfilename(
             title="打开配置文件",
-            filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")]
+            filetypes=[("文本文件", "*.yaml"), ("所有文件", "*.*")]
         )
         return file_path
         

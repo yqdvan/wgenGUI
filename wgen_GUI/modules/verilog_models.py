@@ -22,7 +22,7 @@ class VerilogPort:
         else:
             self.width = width
         
-        self.source = source
+        self.source:VerilogPort = source
         self.destinations: list[VerilogPort] = []  # 存储多个目标端口
     
     def __str__(self):
@@ -414,6 +414,69 @@ class VerilogModuleCollection:
         else:
             raise TypeError("添加的模块必须是VerilogModule类型")
     
+    def update_module(self, md_list: list[VerilogModule]) -> str:
+        """更新模块内部信息"""
+        ans_str = "update info:\n"
+        # 0. 检查是否有模块需要更新
+        if not md_list:
+            ans_str += "no VerilogModule need update;\n"
+            return ans_str
+
+        # 1.先处理新增的module
+        for module in md_list:
+            if module.name not in [m.name for m in self.modules]:
+                self.add_module(module)
+                ans_str += f"VerilogModule {module.name} add success;\n"
+                ans_str += module.__str__() + "\n"
+
+        # 2.处理已存在的module
+        for module in md_list:
+            self_md: VerilogModule = self.get_module(module.name)
+            for port in module.ports:
+                if port.name not in [p.name for p in self_md.ports]:
+                    # 端口不存在，添加端口
+                    self_md.add_port(port)
+                    ans_str += f"VerilogModule {module.name} port {port.name} add success;\n"
+                    ans_str += port.__str__() + "\n"
+
+                elif port.width != self_md.get_port(port.name).width:
+                    # 端口已存在，但位宽不同，更新位宽
+                    self_port: VerilogPort = self_md.get_port(port.name)
+                    ans_str += f"VerilogModule {module.name} port {port.name} old width is {self_port.width};\n"
+                    self_port.width = port.width
+                    ans_str += f"VerilogModule {module.name} port {port.name} update to {self_port.width};\n"
+                    ans_str += port.__str__() + "\n"
+
+                    # 删除这个端口的所有连接信息
+                    ans_str += self.delete_port_connection(self_md, self_port)
+                else:
+                    # 端口已存在，位宽也相等，不进行添加操作
+                    ans_str += f"VerilogModule {module.name} port {port.name} has no change;\n"
+
+        # 3. 处理md_list中没有，而self.modules中有的module
+        for self_md in self.modules:
+            if self_md.name not in [m.name for m in md_list]:
+                ans_str += f"VerilogModule {self_md.name} delete success;\n"
+                self.modules.remove(self_md)
+
+        ans_str += f"VerilogModule {module.name} port update success;\n"
+
+        # md_list 长度
+        ans_str += f"Update total {len(md_list)} VerilogModules;\n"
+        return ans_str
+
+    def delete_port_connection(self, module: VerilogModule, port: VerilogPort) -> str:
+        ans_str = ""
+        # 删除这个端口的所有连接信息
+        module.source = None
+        port.destinations: list[VerilogPort] = []
+
+        # 删除collections中所有包含这个端口的连接,并返回删除的连接
+        deleted_conns = [conn for conn in self.connections if conn.source_port == port or conn.dest_port == port]
+        ans_str += f"VerilogModule {module.name} port {port.name} delete {len(deleted_conns)} connections;\n"
+        self.connections = [conn for conn in self.connections if conn.source_port != port and conn.dest_port != port]
+        return ans_str
+
     def get_module(self, module_name):
         """
         根据模块名称获取模块对象
