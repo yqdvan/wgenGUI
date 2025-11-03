@@ -600,14 +600,15 @@ class WGenGUI:
                     # 构建属性信息
                     properties = module.__str__()
                     # messagebox.showinfo("模块属性", properties)
-                    top = tk.Toplevel()
-                    top.title("模块属性")
-                    text = tk.Text(top, wrap=tk.WORD)
-                    text.insert(tk.END, properties)
-                    text.pack(fill=tk.BOTH, expand=True)
-                    text.configure(state=tk.DISABLED)
-                    button = ttk.Button(top, text="确定", command=top.destroy)
-                    button.pack(pady=5)                    
+                    # top = tk.Toplevel()
+                    # top.title("模块属性")
+                    # text = tk.Text(top, wrap=tk.WORD)
+                    # text.insert(tk.END, properties)
+                    # text.pack(fill=tk.BOTH, expand=True)
+                    # text.configure(state=tk.DISABLED)
+                    # button = ttk.Button(top, text="确定", command=top.destroy)
+                    # button.pack(pady=5)          
+                    self._show_scolledtext(properties, "模块属性")          
                     break
 
     def _set_as_master(self):
@@ -1095,7 +1096,7 @@ class WGenGUI:
         # 先隐藏窗口，避免闪烁
         result_window.withdraw()
         
-        result_window.title(title)
+        result_window.title("详细信息")
         result_window.geometry("600x400")
         result_window.resizable(True, True)
         
