@@ -1139,7 +1139,7 @@ class WGenGUI:
         about_message = f"""
 WGenGUI 版本 {self.version}
 
-著作权所有 © 2023
+著作权所有 © 2025
 
 基本功能：
 - 模块互联层次结构展示
