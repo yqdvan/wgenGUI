@@ -389,7 +389,7 @@ class WGenGUI:
             ans_str = self.collection_DB.update_module(modules)
             
             # 使用可滚动文本框显示详细信息
-            self._show_scolledtext(ans_str, "数据库增量更新Log")
+            self._show_scolledtext(ans_str, "数据库增量更新Log", False)
             
             # save database
             save_result = self._save_database()
@@ -1088,15 +1088,19 @@ class WGenGUI:
         
         return module_text
 
-    def _show_scolledtext(self, text: str, title: str = "showText"):
-        """显示可滚动的文本框，用于展示详细信息"""
-        print("\n显示可滚动的文本框，用于展示详细信息")
-        print("文本内容:", text)
+    def _show_scolledtext(self, text: str, title: str = "showText", modal: bool = True):
+        """显示可滚动的文本框，用于展示详细信息
+        
+        Args:
+            text: 要显示的文本内容
+            title: 窗口标题
+            modal: 是否为模态窗口，True表示需要等待用户操作后才返回主流程，False表示非模态窗口
+        """
         result_window = tk.Toplevel(self.root)
         # 先隐藏窗口，避免闪烁
         result_window.withdraw()
         
-        result_window.title("详细信息")
+        result_window.title("Information")
         result_window.geometry("600x400")
         result_window.resizable(True, True)
         
@@ -1122,14 +1126,21 @@ class WGenGUI:
         y = (screen_height - 400) // 2
         result_window.geometry(f"600x400+{x}+{y}")
         
-        # 设置窗口为模态
-        result_window.transient(self.root)
-        result_window.grab_set()
+        # 根据modal参数决定窗口行为
+        if modal:
+            # 模态窗口：设置为主窗口的临时窗口并获取焦点
+            result_window.transient(self.root)
+            result_window.grab_set()
+        else:
+            # 非模态窗口：不设置为临时窗口，允许被主窗口遮挡
+            pass  # 不调用transient()方法，让窗口按正常方式显示
         
         # 所有组件创建完成后显示窗口
         result_window.deiconify()
         
-        self.root.wait_window(result_window)
+        # 如果是模态窗口，则等待用户关闭
+        if modal:
+            self.root.wait_window(result_window)
 
     def _show_about_info(self):
         """显示关于信息对话框
