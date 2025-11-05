@@ -47,7 +47,6 @@ hierarchy_def:
   - hierarchy: soc_chip
     includes:
       - u_simple
-      - u_simple
       - u_param_module
       - u_complex
       - sublock

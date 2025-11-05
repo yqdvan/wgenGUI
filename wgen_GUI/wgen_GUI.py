@@ -1,5 +1,6 @@
 from time import sleep
 import tkinter as tk
+import traceback
 from tkinter import ttk, messagebox, simpledialog, filedialog, scrolledtext
 import copy
 from collections import deque
@@ -405,6 +406,8 @@ class WGenGUI:
             self._update_master_display()
             self._update_slave_display()
         except Exception as e:
+            # 打印完整的异常堆栈跟踪信息
+            traceback.print_exc()
             messagebox.showerror("错误", f"更新时发生错误,请手动回退数据库！\n {str(e)}")
         
     def _create_connection(self):

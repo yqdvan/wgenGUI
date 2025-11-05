@@ -1,3 +1,5 @@
+from typing import Optional, List
+
 class VerilogPort:
     """Verilog端口类，用于描述Verilog模块的端口信息"""
     
@@ -59,6 +61,11 @@ class VerilogPort:
                     dest_info += f"    {dest_module.name}.{dest_port.name}\n"            
 
         return f"father md: {self.father_module.name}\nport type: {self.direction}\nport name: {self.name}{width_str}\n{source_info}\n{dest_info}"
+
+    def get_port_info(self) -> str:
+        """获取端口的信息"""
+        # 返回 格式为 port type, portname, port width   
+        return f"{self.direction}, {self.name}, {self.get_width_value()} bit(s)"
 
     def get_width_value(self) -> int:
         """获取端口的位宽"""
@@ -161,7 +168,7 @@ class VerilogModule:
         """获取所有双向端口"""
         return self.get_ports_by_direction('inout')
     
-    def get_port(self, port_name):
+    def get_port(self, port_name, port_list:list[VerilogPort] = None):
         """
         根据端口名称获取端口对象
         
@@ -171,7 +178,9 @@ class VerilogModule:
         返回:
             VerilogPort or None: 找到的端口对象，如果未找到则返回None
         """
-        for port in self.ports:
+        if port_list is None:
+            port_list = self.ports
+        for port in port_list:
             if port.name == port_name:
                 return port
         return None
@@ -422,36 +431,79 @@ class VerilogModuleCollection:
             ans_str += "no VerilogModule need update!"
             raise ValueError(ans_str)
 
-        # 1.先处理新增的module
-        for module in md_list:
-            if module.name not in [m.name for m in self.modules]:
-                self.add_module(module)
-                ans_str += f"VerilogModule {module.name} add success;\n"
-                ans_str += module.__str__() + "\n\n"
+        # 1. 先处理新增的module
+        new_md_list = []
+        for yaml_md in md_list:
+            new_md = self.get_module(yaml_md.name)
+            if new_md is None:
+                # 1.1 检查是否在hierarchy中
+                if yaml_md.top_module is None and yaml_md.includes is None:
+                    raise ValueError(f"VerilogModule {yaml_md.name} is not in hierarchy and not included by other modules, can not be added.")
+
+                # 1.2 添加新模块
+                new_md = VerilogModule(yaml_md.name, yaml_md.file_path, yaml_md.module_def_name)
+                new_md.add_ports(yaml_md.ports)
+
+                self.add_module(new_md)
+                new_md_list.append(new_md)
+
+                ans_str += f"VerilogModule {yaml_md.name} add success;\n"
+                ans_str += new_md.__str__() + "\n"
+                ans_str += f"{yaml_md.module_def_name} port info:\n"
+                for port in new_md.ports:       
+                    ans_str += port.get_port_info() + "\n"
+        # 1.3 处理新模块的top和include(防止有依赖关系的module也是新加的，因此加完了之后再处理hierarchy)
+        if new_md_list is not None:
+            ans_str += "\n"
+            for new_md in new_md_list :
+                yaml_md = self.get_module( new_md.name, md_list)
+                if(yaml_md.top_module is not None):
+                    new_top = self.get_module(yaml_md.top_module.name)
+                    new_md.top_module = new_top
+                    if new_md not in new_top.includes:
+                        new_top.includes.append(new_md)
+                        ans_str += f"VerilogModule {new_top.name} update include {new_md.name};\n"
+                else:
+                    raise ValueError(f"VerilogModule {new_md.name} top_module is not in hierarchy, can not be added.") # add other soc_chip is illegal
+
+                if(yaml_md.includes is not None):
+                    for include in yaml_md.includes:
+                        include_md = self.get_module(include.name)
+                        if include_md is None:
+                            raise ValueError(f"VerilogModule {new_md.name} include {include.name} is not in hierarchy, can not be added.")
+                        if include_md not in new_md.includes:   
+                            new_md.includes.append(include_md)
+                            ans_str += f"VerilogModule {new_md.name} update include {include_md.name};\n"
+                        include_md.top_module = new_md
+
+                ans_str += f"VerilogModule {new_md.name} include {[include.name for include in new_md.includes]};\n"
+                ans_str += f"VerilogModule {new_md.name} hierarchy process done;\n"
+                ans_str += "\n"
 
         # 2.处理已存在的module
         for module in md_list:
             self_md: VerilogModule = self.get_module(module.name)
-            for port in module.ports:
-                if port.name not in [p.name for p in self_md.ports]:
-                    # 端口不存在，添加端口
-                    self_md.add_port(port)
-                    ans_str += f"VerilogModule {module.name} port {port.name} add success;\n"
-                    ans_str += port.__str__() + "\n"
+            if self_md is not None and module.ports is not None and self_md.ports is not None:
+                for port in module.ports:
+                    if port.name not in [p.name for p in self_md.ports]:
+                        # 端口不存在，添加端口
+                        self_md.add_port(port)
+                        ans_str += f"VerilogModule {module.name} port {port.name} add success;\n"
+                        ans_str += port.__str__() + "\n"
 
-                elif port.width != self_md.get_port(port.name).width:
-                    # 端口已存在，但位宽不同，更新位宽
-                    self_port: VerilogPort = self_md.get_port(port.name)
-                    ans_str += f"VerilogModule {module.name} port {port.name} old width is {self_port.width};\n"
-                    self_port.width = port.width
-                    ans_str += f"VerilogModule {module.name} port {port.name} update to {self_port.width};\n"
-                    ans_str += port.__str__() + "\n"
+                    elif port.width != self_md.get_port(port.name).width:
+                        # 端口已存在，但位宽不同，更新位宽
+                        self_port: VerilogPort = self_md.get_port(port.name)
+                        ans_str += f"VerilogModule {module.name} port {port.name} old width is {self_port.width};\n"
+                        self_port.width = port.width
+                        ans_str += f"VerilogModule {module.name} port {port.name} update to {self_port.width};\n"
+                        ans_str += port.__str__() + "\n"
 
-                    # 删除这个端口的所有连接信息
-                    ans_str += self.delete_port_connection(self_md, self_port)
-                else:
-                    # 端口已存在，位宽也相等，不进行添加操作
-                    ans_str += f"VerilogModule {module.name} port {port.name} has no change;\n"
+                        # 删除这个端口的所有连接信息
+                        ans_str += self.delete_port_connection(self_md, self_port)
+                    else:
+                        # 端口已存在，位宽也相等，不进行添加操作
+                        ans_str += f"VerilogModule {module.name} port {port.name} has no change;\n"
             ans_str += "\n"
 
         # 3. 处理md_list中没有，而self.modules中有的module
@@ -466,15 +518,16 @@ class VerilogModuleCollection:
         # 3.1 如果被删除的md存在于 新hierarchy，直接报错
         for del_md in del_list:
             for kp_md in keep_list:
-                # new_kp_md 是从md_list中根据kp_md的name查到的module
-                new_kp_md = next((m for m in md_list if m.name == kp_md.name), None)
+                new_kp_md = self.get_module(kp_md.name, md_list)
                 if not new_kp_md:
                     raise ValueError(f"VerilogModule {new_kp_md.name} not found in md_list!")
 
                 if new_kp_md.top_module and del_md.name == new_kp_md.top_module.name:
                     raise ValueError(f"VerilogModule {del_md.name} is top_module of {new_kp_md.name}, can not be deleted")
+
                 if new_kp_md.includes and del_md.name in [m.name for m in new_kp_md.includes]:
                     raise ValueError(f"VerilogModule {del_md.name} is included in {new_kp_md.name}, can not be deleted")
+
         # 3.2 开始删除del_list中的module
         ans_str += "\n"
         for del_md in del_list:
@@ -484,8 +537,13 @@ class VerilogModuleCollection:
             self.modules.remove(del_md)
             ans_str += f"VerilogModule {del_md.name} is deleted, {len(del_md.ports)} ports are deleted;\n\n"
         
-        # 3.3 开始删除del_md 在hierarchy中的关系
-
+        # 3.3 开始删除del_md 在hierarchy中的include关系
+        for kp_md in keep_list:
+            for del_md in del_list:
+                if del_md.name in [m.name for m in kp_md.includes]:
+                    kp_md.includes.remove(del_md)
+                    ans_str += f"VerilogModule {kp_md.name} remove include {del_md.name};\n"
+        
         # md_list 长度
         ans_str += f"\nA total of {len(md_list)} VerilogModules were verified.\n"
         return ans_str
@@ -502,7 +560,10 @@ class VerilogModuleCollection:
         self.connections = [conn for conn in self.connections if conn.source_port != port and conn.dest_port != port]
         return ans_str
 
-    def get_module(self, module_name):
+    def get_module(self, module_name: str, md_list: Optional[List['VerilogModule']] = None) -> Optional['VerilogModule']:
+        # 修复默认参数问题，避免使用可变默认参数
+        if md_list is None:
+            md_list = self.modules
         """
         根据模块名称获取模块对象
         
@@ -512,7 +573,7 @@ class VerilogModuleCollection:
         返回:
             VerilogModule or None: 找到的模块对象，如果未找到则返回None
         """
-        for module in self.modules:
+        for module in md_list:
             if module.name == module_name:
                 return module
         return None
