@@ -416,18 +416,18 @@ class VerilogModuleCollection:
     
     def update_module(self, md_list: list[VerilogModule]) -> str:
         """更新模块内部信息"""
-        ans_str = "update info:\n"
+        ans_str = "update info:\n\n"
         # 0. 检查是否有模块需要更新
         if not md_list:
-            ans_str += "no VerilogModule need update;\n"
-            return ans_str
+            ans_str += "no VerilogModule need update!"
+            raise ValueError(ans_str)
 
         # 1.先处理新增的module
         for module in md_list:
             if module.name not in [m.name for m in self.modules]:
                 self.add_module(module)
                 ans_str += f"VerilogModule {module.name} add success;\n"
-                ans_str += module.__str__() + "\n"
+                ans_str += module.__str__() + "\n\n"
 
         # 2.处理已存在的module
         for module in md_list:
@@ -452,17 +452,42 @@ class VerilogModuleCollection:
                 else:
                     # 端口已存在，位宽也相等，不进行添加操作
                     ans_str += f"VerilogModule {module.name} port {port.name} has no change;\n"
+            ans_str += "\n"
 
         # 3. 处理md_list中没有，而self.modules中有的module
+        keep_list: list[VerilogModule] = []
+        del_list: list[VerilogModule] = []        
         for self_md in self.modules:
             if self_md.name not in [m.name for m in md_list]:
-                ans_str += f"VerilogModule {self_md.name} delete success;\n"
-                self.modules.remove(self_md)
+                del_list.append(self_md)
+            else:
+                keep_list.append(self_md)
 
-        ans_str += f"VerilogModule {module.name} port update success;\n"
+        # 3.1 如果被删除的md存在于 新hierarchy，直接报错
+        for del_md in del_list:
+            for kp_md in keep_list:
+                # new_kp_md 是从md_list中根据kp_md的name查到的module
+                new_kp_md = next((m for m in md_list if m.name == kp_md.name), None)
+                if not new_kp_md:
+                    raise ValueError(f"VerilogModule {new_kp_md.name} not found in md_list!")
+
+                if new_kp_md.top_module and del_md.name == new_kp_md.top_module.name:
+                    raise ValueError(f"VerilogModule {del_md.name} is top_module of {new_kp_md.name}, can not be deleted")
+                if new_kp_md.includes and del_md.name in [m.name for m in new_kp_md.includes]:
+                    raise ValueError(f"VerilogModule {del_md.name} is included in {new_kp_md.name}, can not be deleted")
+        # 3.2 开始删除del_list中的module
+        ans_str += "\n"
+        for del_md in del_list:
+            ans_str += f"VerilogModule {del_md.name} find {len(del_md.ports)} ports;\n"
+            for port in del_md.ports:
+                ans_str += self.delete_port_connection(del_md, port)
+            self.modules.remove(del_md)
+            ans_str += f"VerilogModule {del_md.name} is deleted, {len(del_md.ports)} ports are deleted;\n\n"
+        
+        # 3.3 开始删除del_md 在hierarchy中的关系
 
         # md_list 长度
-        ans_str += f"Update total {len(md_list)} VerilogModules;\n"
+        ans_str += f"\nA total of {len(md_list)} VerilogModules were verified.\n"
         return ans_str
 
     def delete_port_connection(self, module: VerilogModule, port: VerilogPort) -> str:

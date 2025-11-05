@@ -394,10 +394,18 @@ class WGenGUI:
             # save database
             save_result = self._save_database()
             Toast(self.root, save_result, duration=2000, position='center')
+
+            self.modules = self.collection_DB.modules
+            self.master_module = self.modules[0]
+            self.slave_module = self.modules[1]
+
+            # 更新GUI显示
+            self._update_modules_list()
+            self._update_hierarchy_view()
             self._update_master_display()
             self._update_slave_display()
         except Exception as e:
-            messagebox.showerror("错误", f"增量更新数据库时发生错误: {str(e)}")
+            messagebox.showerror("错误", f"更新时发生错误,请手动回退数据库！\n {str(e)}")
         
     def _create_connection(self):
         """创建连接按钮的响应函数，显示选中的master和slave端口"""
@@ -494,7 +502,6 @@ class WGenGUI:
             self.master_ports_tree.delete(item)
         for item in self.slave_ports_tree.get_children():
             self.slave_ports_tree.delete(item)
-        self._update_hierarchy_view()
         
         file_path = self.file_handler.open_database_dialog()
         if file_path:
@@ -508,10 +515,14 @@ class WGenGUI:
 
                 # 直接使用VerilogModule对象，不再转换为结构体
                 self.modules = self.collection_DB.modules
+                self.master_module = self.modules[0]
+                self.slave_module = self.modules[1]
 
-                # 更新模块列表
+                # 更新GUI显示
                 self._update_modules_list()
                 self._update_hierarchy_view()
+                self._update_master_display()
+                self._update_slave_display()
             except Exception as e:
                 messagebox.showerror("错误", f"加载Database失败: {str(e)}")
             
@@ -657,15 +668,15 @@ class WGenGUI:
 
         if isinstance(selected_port, VerilogPort):
             # 显示端口详细信息
-            # top = tk.Toplevel()
-            # top.title("端口详细信息")
-            # text = tk.Text(top, wrap=tk.WORD)
-            # text.insert(tk.END, str(selected_port))
-            # text.pack(fill=tk.BOTH, expand=True)
-            # text.configure(state=tk.DISABLED)
-            # button = ttk.Button(top, text="确定", command=top.destroy)
-            # button.pack(pady=5)
-            self._show_scolledtext(str(selected_port), "端口详细信息")
+            top = tk.Toplevel()
+            top.title("端口详细信息")
+            text = tk.Text(top, wrap=tk.WORD)
+            text.insert(tk.END, str(selected_port))
+            text.pack(fill=tk.BOTH, expand=True)
+            text.configure(state=tk.DISABLED)
+            button = ttk.Button(top, text="确定", command=top.destroy)
+            button.pack(pady=5)
+            # self._show_scolledtext(str(selected_port), "端口详细信息")
         else:
             messagebox.showwarning("警告", f"未找到端口 {port_name}")
         
