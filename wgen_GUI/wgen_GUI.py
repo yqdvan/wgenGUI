@@ -587,6 +587,8 @@ class WGenGUI:
             self.modules_tree.delete(item)
         
         # 添加新模块
+        # 给modules根据name排序
+        self.modules.sort(key=lambda x: x.name)
         for module in self.modules:
             # 存储模块名称，使用VerilogModule对象的name属性
             self.modules_tree.insert('', tk.END, text=module.name, values=(module.name,))
@@ -734,7 +736,7 @@ class WGenGUI:
 
             # 将show_ports 内的port按照direction排序
             show_ports.sort(key=lambda x: x.direction)
-                            
+
             for port in show_ports:
                 if isinstance(port, VerilogPort):
                     width_show = "[" +str(port.width['high']) +":"+ str(port.width['low']) + "]"
