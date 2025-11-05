@@ -696,6 +696,10 @@ class WGenGUI:
             show_ports = self.master_module.get_output_ports()
             if self.master_module.need_gen:
                 show_ports.extend(self.master_module.get_input_ports())
+
+            # 将show_ports 内的port按照direction排序
+            show_ports.sort(key=lambda x: x.direction)
+
             for port in show_ports:
                 if isinstance(port, VerilogPort):
                     width_show = "[" +str(port.width['high']) +":"+ str(port.width['low']) + "]"
@@ -727,6 +731,10 @@ class WGenGUI:
             show_ports = self.slave_module.get_input_ports()
             if self.slave_module.need_gen:
                 show_ports.extend(self.slave_module.get_output_ports())
+
+            # 将show_ports 内的port按照direction排序
+            show_ports.sort(key=lambda x: x.direction)
+                            
             for port in show_ports:
                 if isinstance(port, VerilogPort):
                     width_show = "[" +str(port.width['high']) +":"+ str(port.width['low']) + "]"
