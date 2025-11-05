@@ -274,6 +274,10 @@ class VerilogModule:
         
         return result
 
+    def get_include_names(self):
+        """获取包含的模块名称列表"""
+        return [module.name for module in self.includes]
+
 class VerilogConnection:
     """Verilog连接类，用于描述两个模块之间的连接"""
     
@@ -448,7 +452,6 @@ class VerilogModuleCollection:
                 new_md_list.append(new_md)
 
                 ans_str += f"VerilogModule {yaml_md.name} add success;\n"
-                ans_str += new_md.__str__() + "\n"
                 ans_str += f"{yaml_md.module_def_name} port info:\n"
                 for port in new_md.ports:       
                     ans_str += port.get_port_info() + "\n"
@@ -478,6 +481,7 @@ class VerilogModuleCollection:
 
                 ans_str += f"VerilogModule {new_md.name} include {[include.name for include in new_md.includes]};\n"
                 ans_str += f"VerilogModule {new_md.name} hierarchy process done;\n"
+                ans_str += new_md.__str__() + "\n"
                 ans_str += "\n"
 
         # 2.处理已存在的module
@@ -489,7 +493,7 @@ class VerilogModuleCollection:
                         # 端口不存在，添加端口
                         self_md.add_port(port)
                         ans_str += f"VerilogModule {module.name} port {port.name} add success;\n"
-                        ans_str += port.__str__() + "\n"
+                        ans_str += port.get_port_info() + "\n"
 
                     elif port.width != self_md.get_port(port.name).width:
                         # 端口已存在，但位宽不同，更新位宽
@@ -497,7 +501,7 @@ class VerilogModuleCollection:
                         ans_str += f"VerilogModule {module.name} port {port.name} old width is {self_port.width};\n"
                         self_port.width = port.width
                         ans_str += f"VerilogModule {module.name} port {port.name} update to {self_port.width};\n"
-                        ans_str += port.__str__() + "\n"
+                        ans_str += port.get_port_info() + "\n"
 
                         # 删除这个端口的所有连接信息
                         ans_str += self.delete_port_connection(self_md, self_port)

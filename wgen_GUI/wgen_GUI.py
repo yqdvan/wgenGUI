@@ -13,7 +13,7 @@ from tkinter import ttk
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
-    version = "1.0.0"
+    version = "1.1.0" 
     def __init__(self, root):
         """初始化GUI界面"""
         self.root = root

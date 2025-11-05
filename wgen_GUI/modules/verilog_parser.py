@@ -160,11 +160,11 @@ class VerilogParser:
                         if parent_module:
                             for included_module_name in included_modules:
                                 included_module = self.get_module_by_name(modules_ans, included_module_name)
-                                if included_module:
+                                if included_module and included_module.name not in parent_module.get_include_names():
                                     parent_module.includes.append(included_module)
                                     included_module.top_module = parent_module
                                 else:
-                                    messagebox.showwarning("警告", f"未找到包含模块(RTL verilog) {included_module_name}")
+                                    messagebox.showwarning("警告", f"未找到包含模块(RTL verilog) {included_module_name} or 已包含!")
                                     return None
                         else:
                             messagebox.showwarning("警告", f"未找到父模块(generate verilog) {parent_module_name}")
@@ -174,6 +174,10 @@ class VerilogParser:
             # 如果解析失败，返回空列表
             messagebox.showerror("错误", f"解析yaml配置文件失败: {e}")
         
+        print("parse_config_file modules_ans begin ---->")
+        for module in modules_ans:
+            print(str(module)+"\n")
+        print("parse_config_file modules_ans end  <----")
         return modules_ans
         
 
