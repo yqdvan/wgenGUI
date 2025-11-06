@@ -329,17 +329,31 @@ class WGenGUI:
         # 添加创建连接按钮
         menu_bar.add_command(label="创建连接", command=self._create_connection)
 
+        # 添加查询菜单
+        query_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="查询", menu=query_menu)
+        query_menu.add_command(label="未连接端口", command=self._show_unconnected_ports_info)
+        query_menu.add_command(label="所有连接", command=self._show_all_connnections_info)
+
         # 添加帮助菜单
         help_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="帮助", menu=help_menu)
         help_menu.add_command(label="快捷键列表", command= lambda: messagebox.showinfo("快捷键列表", "空格：创建连接\n"))   
-
-        # 添加关于菜单
-        about_menu = tk.Menu(menu_bar, tearoff=0)
-        menu_bar.add_cascade(label="关于", menu=about_menu)
-        about_menu.add_command(label="关于wgen_GUI", command=self._show_about_info)  
+        help_menu.add_command(label="关于", command=self._show_about_info) 
 
         self.root.config(menu=menu_bar)
+
+    def _show_all_connnections_info(self):
+        """查询所有连接按钮的响应函数"""
+        # 弹出确认对话框
+        # messagebox.showinfo("所有连接", "所有连接信息：\n" + self.collection_DB.get_all_connections_info())
+        self._show_scolledtext( self.collection_DB.get_all_connections_info(), "所有连接信息", False)
+
+    def _show_unconnected_ports_info(self):
+        """查询未连接端口按钮的响应函数"""
+        # 弹出确认对话框
+        # messagebox.showinfo("未连接端口", "未连接端口信息：\n" + self.collection_DB.get_unconnected_ports_info())
+        self._show_scolledtext( self.collection_DB.get_unconnected_ports_info(), "未连接端口信息", False)
 
     def _export_wgen_config(self):
         """导出wgen_config按钮的响应函数"""
@@ -1183,6 +1197,8 @@ WGenGUI 版本 {self.version}
 - 电路示意图可视化显示
 - 支持画布缩放和拖动功能
 - 端口连接状态管理
+- 所有连接信息查询
+- 支持模块信息批量更新
 
 感谢使用本软件！
         """

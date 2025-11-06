@@ -64,8 +64,8 @@ class VerilogPort:
 
     def get_port_info(self) -> str:
         """获取端口的信息"""
-        # 返回 格式为 port type, portname, port width   
-        return f"{self.direction}, {self.name}, {self.get_width_value()} bit(s)"
+        # 返回 格式为 port type, module_name.portname, port width   
+        return f"{self.direction}, {self.father_module.name}.{self.name}, {self.get_width_value()} bit(s)"
 
     def get_width_value(self) -> int:
         """获取端口的位宽"""
@@ -407,6 +407,43 @@ class VerilogModuleCollection:
         self.modules: list[VerilogModule] = []  # 存储模块列表
         self.connections: list[VerilogConnection] = []  # 存储模块之间的连接
     
+    def get_all_connections_info(self)-> str:
+        """获取所有连接信息"""
+        # 给connections排序
+        self.connections.sort(key=lambda conn: (conn.source_module_name, conn.source_port.name, conn.dest_module_name, conn.dest_port.name))
+        return "\n".join(str(conn) for conn in self.connections)
+
+    def get_unconnected_ports_info(self)-> str:
+        """获取所有未连接的端口信息"""
+        unconnected_gen_ports: list[VerilogPort] = []
+        unconnected_non_gen_ports: list[VerilogPort] = []
+        for module in self.modules:
+            if module.need_gen:
+                for port in module.ports:
+                    if not port.source and len(port.destinations) == 0:
+                        unconnected_gen_ports.append(port)
+            else:
+                for port in module.ports:
+                    if not port.source or len(port.destinations) == 0:
+                        unconnected_non_gen_ports.append(port)
+
+        ans_str = ""
+        if unconnected_gen_ports:
+            # unconnected_gen_ports按照端口direction排序
+            unconnected_gen_ports.sort(key=lambda port: port.direction)
+            ans_str += "未连接generated module 端口:\n" + "\n".join(port.get_port_info() for port in unconnected_gen_ports) + "\n"
+        else:
+            ans_str += "所有generated module 端口均已连接\n"
+        
+        if unconnected_non_gen_ports:
+            # unconnected_non_gen_ports按照端口direction排序
+            unconnected_non_gen_ports.sort(key=lambda port: port.direction)
+            ans_str += "未连接常规module 端口:\n" + "\n".join(port.get_port_info() for port in unconnected_non_gen_ports) + "\n"
+        else:
+            ans_str += "所有常规module端口均已连接\n"
+        
+        return ans_str
+
     def add_module(self, module):
         """
         添加一个模块到集合
@@ -616,7 +653,6 @@ class VerilogModuleCollection:
         self.add_connection(source_module_name, source_port_name, dest_module_name, dest_port_name,
                             source_bit_range, dest_bit_range)
 
-
     def add_connection(self, source_module_name, source_port_name, dest_module_name, dest_port_name, 
                        source_bit_range=None, dest_bit_range=None):
         """
@@ -670,7 +706,6 @@ class VerilogModuleCollection:
         # if dest_port.is_input() or dest_port.is_inout():
         dest_port.source = source_port
     
-
     def remove_master_port_connections(self, master_port: VerilogPort):
         """
         删除主端口的连接
@@ -705,7 +740,6 @@ class VerilogModuleCollection:
             # message_str = f"成功删除主端口 {master_port.name} 的所有连接"
         
         return message_str
-
 
     def remove_slave_port_connection(self, slave_port: VerilogPort):
         """
@@ -745,7 +779,6 @@ class VerilogModuleCollection:
             message_str = f"从端口 {slave_port.name} 不在源端口的连接列表中"
         
         return message_str
-
 
     def remove_connection(self, source_module_name, source_port_name, dest_module_name, dest_port_name):
         """
