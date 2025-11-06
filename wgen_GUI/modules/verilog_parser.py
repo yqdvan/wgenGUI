@@ -10,6 +10,14 @@ from .verilog_models import VerilogModule, VerilogPort
 from tkinter import messagebox
 
 class VerilogParser:
+    _yaml_example = """
+# YAML文件格式示例
+modules:
+  - module_name: simple_module
+    ins_name: u_simple
+    path: ./examples/simple_module.v
+"""
+
     """Verilog文件解析器，用于提取模块的输入输出端口信息"""
     
     def __init__(self):

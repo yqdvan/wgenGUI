@@ -22,17 +22,6 @@ class WGenGUI:
 
         style = ttk.Style()
         style.theme_use('clam')  # 使用clam主题
-        
-        # # 设置软件图标
-        # try:
-        #     import os
-        #     # 获取图标文件的绝对路径
-        #     icon_path = os.path.join(os.path.dirname(__file__), "icon.ico")
-        #     print(icon_path)
-        #     icon = tk.PhotoImage(file=icon_path)
-        #     self.root.iconphoto(True, icon)
-        # except Exception as e:
-        #     print(f"无法加载图标: {e}")
 
         self.root.geometry("1200x800")
 
@@ -334,11 +323,15 @@ class WGenGUI:
         menu_bar.add_cascade(label="查询", menu=query_menu)
         query_menu.add_command(label="未连接端口", command=self._show_unconnected_ports_info)
         query_menu.add_command(label="所有连接", command=self._show_all_connnections_info)
+        query_menu.add_separator()
+        query_menu.add_command(label="根据实例名", command= lambda: simpledialog.askstring("查询连接信息", "根据实例名查询连接信息(暂未开发敬请期待！)\n请输入实例名："))
 
         # 添加帮助菜单
         help_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="帮助", menu=help_menu)
-        help_menu.add_command(label="快捷键列表", command= lambda: messagebox.showinfo("快捷键列表", "空格：创建连接\n"))   
+        help_menu.add_command(label="配置文件示例", command= lambda: self._show_scolledtext(VerilogParser._yaml_example, "配置文件示例", False)) 
+        help_menu.add_command(label="快捷键列表", command= lambda: messagebox.showinfo("快捷键列表", "空格：创建连接\n"))  
+        help_menu.add_separator()
         help_menu.add_command(label="关于", command=self._show_about_info) 
 
         self.root.config(menu=menu_bar)
@@ -1280,15 +1273,7 @@ if __name__ == "__main__":
         splash_root.destroy()
         # 创建主应用
         root = tk.Tk()
-        # 设置主应用窗口图标
-        try:
-            # 获取图标文件的绝对路径
-            icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
-            icon = tk.PhotoImage(file=icon_path)
-            root.iconphoto(True, icon)
-        except Exception as e:
-            print(f"无法加载图标: {e}")
-        
+
         app = WGenGUI(root)
         root.mainloop()
     
