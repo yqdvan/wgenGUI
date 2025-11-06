@@ -106,12 +106,15 @@ class FileHandler:
             # 深拷贝collection_DB
             db_copy = copy.deepcopy(collection_DB)
             
-            # 获取当前文件的父目录
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            # 向上一级目录，然后进入sessions目录
-            sessions_dir = os.path.join(current_dir, "..", "sessions")
-            # 规范化路径
-            sessions_dir = os.path.normpath(sessions_dir)
+            # # 获取当前文件的父目录
+            # current_dir = os.path.dirname(os.path.abspath(__file__))
+            # # 向上一级目录，然后进入sessions目录
+            # sessions_dir = os.path.join(current_dir, "..", "sessions")
+            # # 规范化路径
+            # sessions_dir = os.path.normpath(sessions_dir)
+
+            # 在current work dir创建 sessions.bak 目录（如果不存在）
+            sessions_dir = os.path.join(os.getcwd(), "sessions.bak")
                 
             # 创建sessions目录（如果不存在）
             if not os.path.exists(sessions_dir):

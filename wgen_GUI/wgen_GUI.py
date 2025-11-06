@@ -14,6 +14,7 @@ from tkinter import ttk
 class WGenGUI:
     """Verilog模块互联GUI工具"""
     version = "1.1.0" 
+    
     def __init__(self, root):
         """初始化GUI界面"""
         self.root = root
@@ -22,16 +23,16 @@ class WGenGUI:
         style = ttk.Style()
         style.theme_use('clam')  # 使用clam主题
         
-        # 设置软件图标
-        try:
-            import os
-            # 获取图标文件的绝对路径
-            icon_path = os.path.join(os.path.dirname(__file__), "icon.ico")
-            print(icon_path)
-            icon = tk.PhotoImage(file=icon_path)
-            self.root.iconphoto(True, icon)
-        except Exception as e:
-            print(f"无法加载图标: {e}")
+        # # 设置软件图标
+        # try:
+        #     import os
+        #     # 获取图标文件的绝对路径
+        #     icon_path = os.path.join(os.path.dirname(__file__), "icon.ico")
+        #     print(icon_path)
+        #     icon = tk.PhotoImage(file=icon_path)
+        #     self.root.iconphoto(True, icon)
+        # except Exception as e:
+        #     print(f"无法加载图标: {e}")
 
         self.root.geometry("1200x800")
 
@@ -1192,6 +1193,14 @@ if __name__ == "__main__":
     import sys
     import os
     import tkinter as tk
+
+    # 获取当前工作目录（用户执行命令的目录）
+    current_working_directory = os.getcwd()
+    print(f"用户执行命令的目录: {current_working_directory}")
+
+    # 如果需要获取程序本身所在的目录，可以使用
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    print(f"程序本身所在的目录: {script_directory}")
 
     # 添加模块目录到Python路径
     sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))

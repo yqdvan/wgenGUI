@@ -46,6 +46,10 @@ class VerilogParser:
                     for module_info in config_data['modules']:
                         # 对于每个模块，解析其端口信息
                         filePath = module_info['path']
+                        
+                        # 如果filePath中包含有 ${xxx}的部分，需要将他替换成环境变量的值
+                        filePath = os.path.expandvars(filePath)
+
                         if not os.path.isfile(filePath):
                             filePath = filePath+ "/" +module_info['module_name']+".v"
                             
