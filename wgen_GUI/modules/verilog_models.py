@@ -413,6 +413,22 @@ class VerilogModuleCollection:
         self.connections.sort(key=lambda conn: (conn.source_module_name, conn.source_port.name, conn.dest_module_name, conn.dest_port.name))
         return "\n".join(str(conn) for conn in self.connections)
 
+    def get_connections_by_instance_name(self, instance_name: str)-> str:
+        """根据实例名获取所有连接信息"""
+        ins_obj = self.get_module(instance_name)
+        if ins_obj is None:
+            return f"实例名 '{instance_name}' 不存在"
+        
+        ans_str = ""
+        conn_list:List[VerilogConnection] = []
+        for conn in self.connections:
+            if conn.source_module_name == instance_name or conn.dest_module_name == instance_name:
+                conn_list.append(conn)
+        conn_list.sort(key=lambda conn: (conn.source_module_name, conn.source_port.name, conn.dest_module_name, conn.dest_port.name))
+        for conn in conn_list:
+            ans_str += str(conn) + "\n"
+        return ans_str
+
     def get_unconnected_ports_info(self)-> str:
         """获取所有未连接的端口信息"""
         unconnected_gen_ports: list[VerilogPort] = []

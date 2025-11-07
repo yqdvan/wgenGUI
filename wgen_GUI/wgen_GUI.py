@@ -324,7 +324,7 @@ class WGenGUI:
         query_menu.add_command(label="未连接端口", command=self._show_unconnected_ports_info)
         query_menu.add_command(label="所有连接", command=self._show_all_connnections_info)
         query_menu.add_separator()
-        query_menu.add_command(label="根据实例名", command= lambda: simpledialog.askstring("查询连接信息", "根据实例名查询连接信息(暂未开发敬请期待！)\n请输入实例名："))
+        query_menu.add_command(label="根据实例名", command= lambda: self._show_scolledtext(self.collection_DB.get_connections_by_instance_name(simpledialog.askstring("查询连接信息", "根据实例名查询连接信息\n请输入实例名：")), "根据实例名查询连接信息", False))
 
         # 添加帮助菜单
         help_menu = tk.Menu(menu_bar, tearoff=0)
@@ -1220,7 +1220,7 @@ if __name__ == "__main__":
     # 设置启动窗口图标
     try:
         # 获取图标文件的绝对路径
-        icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+        icon_path = os.path.join(os.path.dirname(__file__), "icon.ppm")
         icon = tk.PhotoImage(file=icon_path)
         splash_root.iconphoto(True, icon)
     except Exception as e:
