@@ -324,8 +324,8 @@ class WGenGUI:
         query_menu.add_command(label="未连接端口", command=self._show_unconnected_ports_info)
         query_menu.add_command(label="所有连接", command=self._show_all_connnections_info)
         query_menu.add_separator()
-        query_menu.add_command(label="根据实例名", command= lambda: self._show_scolledtext(self.collection_DB.get_connections_by_instance_name(simpledialog.askstring("查询连接信息", "根据实例名查询连接信息\n请输入实例名：")), "根据实例名查询连接信息", False))
-
+        query_menu.add_command(label="根据实例名", command=self._query_connections_by_instance_name)
+        
         # 添加帮助菜单
         help_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="帮助", menu=help_menu)
@@ -335,6 +335,23 @@ class WGenGUI:
         help_menu.add_command(label="关于", command=self._show_about_info) 
 
         self.root.config(menu=menu_bar)
+
+    def _query_connections_by_instance_name(self):
+        """根据实例名查询连接信息的辅助方法"""
+        if self.collection_DB is None:
+            messagebox.showerror("错误", "请先打开Database!")
+            return
+                    
+        instance_name = simpledialog.askstring(
+            "查询连接信息", 
+            "                根据实例名查询连接信息                \n                    请输入实例名："
+        )
+
+        if instance_name is not None:
+            connections = self.collection_DB.get_connections_by_instance_name(instance_name)
+            self._show_scolledtext(connections, "根据实例名查询连接信息", False)
+        else:
+            Toast(self.root, "用户取消了查询操作", duration=2000, position='center')
 
     def _show_all_connnections_info(self):
         """查询所有连接按钮的响应函数"""
@@ -375,7 +392,7 @@ class WGenGUI:
                 messagebox.showerror("错误", f"保存wgen_config时发生错误: {str(e)}")
         else:
             # 用户取消了保存操作
-            Toast("用户取消了保存操作")
+            Toast(self.root, "用户取消了保存操作", duration=2000, position='center')
             pass
         
     def _try_update_database(self):
