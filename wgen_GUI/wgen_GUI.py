@@ -865,6 +865,44 @@ class WGenGUI:
             self._update_master_display()
             self._update_slave_display()
 
+        elif tree_type == "slave" and action == "optionB" : #tie to tie-0
+            port_obj = self.slave_module.get_port(port_name)
+            if port_obj:
+                ans_str = self.collection_DB.tie01_for_port(0, port_obj)
+                if ans_str is None or ans_str == "success":
+                    save_result = self._save_database()
+                    if save_result is not None and save_result != "":
+                        Toast(self.root, "连接成功\n" + save_result, duration=2000, position='center')
+                        print(f"成功将从端口 {port_name} 连接到 Tie-0 端口")
+                    else:
+                        save_result = "save failed!!!"
+                        messagebox.showerror("错误", save_result)
+                else:
+                    messagebox.showerror("错误", ans_str)
+            else:
+                messagebox.showerror("错误", f"端口 {port_name} 不是 VerilogPort 类型")
+            self._update_master_display()
+            self._update_slave_display()
+
+        elif tree_type == "slave" and action == "optionC":  #tie to tie-1
+            port_obj = self.slave_module.get_port(port_name)
+            if port_obj:
+                ans_str = self.collection_DB.tie01_for_port(1, port_obj)
+                if ans_str is None or ans_str == "success":
+                    save_result = self._save_database()
+                    if save_result is not None and save_result != "":
+                        Toast(self.root, "连接成功\n" + save_result, duration=2000, position='center')
+                        print(f"成功将从端口 {port_name} 连接到 Tie-1 端口")
+                    else:
+                        save_result = "save failed!!!"
+                        messagebox.showerror("错误", save_result)
+                else:
+                    messagebox.showerror("错误", ans_str)
+            else:
+                messagebox.showerror("错误", f"端口 {port_name} 不是 VerilogPort 类型")
+            self._update_master_display()
+            self._update_slave_display()
+
         else:
             show_str = f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}"
             Toast(self.root, show_str, duration=2000, position='center')

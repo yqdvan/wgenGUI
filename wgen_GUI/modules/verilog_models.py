@@ -406,7 +406,41 @@ class VerilogModuleCollection:
         """初始化模块集合"""
         self.modules: list[VerilogModule] = []  # 存储模块列表
         self.connections: list[VerilogConnection] = []  # 存储模块之间的连接
-    
+
+        self.tie_0_port:VerilogPort = VerilogPort("tie_0", "output", {'high': 32767, 'low': 0})  # 存储Tie-0端口
+        self.tie_1_port:VerilogPort = VerilogPort("tie_1", "output", {'high': 32767, 'low': 0})  # 存储Tie-1端口
+        self.system_module = VerilogModule("system_module", "/empty/", "system_module")  # 存储系统模块
+        self.system_module.add_port(self.tie_0_port)
+        self.system_module.add_port(self.tie_1_port)
+        
+    def tie01_for_port(self, tie01: int, port: VerilogPort) -> str:
+        ans_str = "success"
+        tie_port: VerilogPort = self.tie_0_port if tie01 == 0 else self.tie_1_port
+
+        if(port.direction == "output"):
+            ans_str += f"错误：Tie-0/1端口不能连接到输出端口{port.name}\n"
+            return ans_str
+        
+        if(port.direction == "input") and port.source is not None:
+            ans_str += f"错误：Tie-0/1端口不能连接到已连接的输入端口{port.name}\n"
+            return ans_str
+
+        """将Tie-0/1端口连接到指定端口"""
+
+        connection = VerilogConnection(
+            source_module=self.system_module,
+            source_port=tie_port,
+            dest_module=port.father_module,
+            dest_port=port,
+            source_bit_range={'high': port.width['high'], 'low': port.width['low']},
+            dest_bit_range={'high': port.width['high'], 'low': port.width['low']}
+        )
+        self.connections.append(connection)
+
+        port.source = tie_port
+        tie_port.destinations.append(port)
+        return ans_str
+
     def get_all_connections_info(self)-> str:
         """获取所有连接信息"""
         # 给connections排序
@@ -938,10 +972,33 @@ class VerilogModuleCollection:
             }
             connections_dict.append(conn_info)
         
+        # 序列化tie_0_port和tie_1_port
+        tie_ports_dict = {
+            'tie_0_port': {
+                'name': self.tie_0_port.name,
+                'direction': self.tie_0_port.direction,
+                'width': self.tie_0_port.width
+            },
+            'tie_1_port': {
+                'name': self.tie_1_port.name,
+                'direction': self.tie_1_port.direction,
+                'width': self.tie_1_port.width
+            }
+        }
+        
+        # 序列化system_module
+        system_md_dict = {
+            'name': self.system_module.name,
+            'file_path': self.system_module.file_path,
+            'module_def_name': self.system_module.module_def_name
+        }
+        
         # 返回完整的字典表示
         return {
             'modules': modules_dict,
-            'connections': connections_dict
+            'connections': connections_dict,
+            'tie_ports': tie_ports_dict,
+            'system_module': system_md_dict
         }
     
     def to_json(self):
@@ -988,6 +1045,34 @@ class VerilogModuleCollection:
             module_info['__module_object'] = module
             collection.add_module(module)
             module_map[module.name] = module
+        
+        # 恢复tie_0_port和tie_1_port
+        tie_ports_dict = data_dict.get('tie_ports', {})
+        if 'tie_0_port' in tie_ports_dict:
+            tie_0_info = tie_ports_dict['tie_0_port']
+            collection.tie_0_port = VerilogPort(
+                name=tie_0_info.get('name', 'tie_0'),
+                direction=tie_0_info.get('direction', 'output'),
+                width=tie_0_info.get('width', {'high': 32767, 'low': 0})
+            )
+        if 'tie_1_port' in tie_ports_dict:
+            tie_1_info = tie_ports_dict['tie_1_port']
+            collection.tie_1_port = VerilogPort(
+                name=tie_1_info.get('name', 'tie_1'),
+                direction=tie_1_info.get('direction', 'output'),
+                width=tie_1_info.get('width', {'high': 32767, 'low': 0})
+            )
+        
+        # 恢复system_module
+        system_md_dict = data_dict.get('system_module', {})
+        collection.system_module = VerilogModule(
+            name=system_md_dict.get('name', '/empty/'),
+            file_path=system_md_dict.get('file_path', 'system_module'),
+            module_def_name=system_md_dict.get('module_def_name', 'system_module')  
+        )
+        # 重新添加端口到system_module
+        collection.system_module.add_port(collection.tie_0_port)
+        collection.system_module.add_port(collection.tie_1_port)    
         
         # 建立模块之间的引用关系（includes和top_module）
         for module_info in data_dict.get('modules', []):

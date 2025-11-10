@@ -43,8 +43,51 @@ class WgenConfigGenerator(CodeGeneratorInterface):
         result += "\n" + self.gen_generated_md_port_def(database)
         result += "\n" + self.gen_connection_block(database)
 
+        result = self.string_optimize(result)
+        
         return result 
 
+    def string_optimize(self, result: str) -> str:
+        """
+        对输入字符串进行优化，移除多余的空格和空行
+        
+        参数:
+            input_str (str): 输入的字符串
+            
+        返回:
+            str: 优化后的字符串
+        """
+        # result 中 所有 from .* to .* 的行要求按照 to 对齐
+        connection_lines = result.split("\n")
+        
+        # 第一步：找出所有包含"to"的行，并计算每行中"to"的位置
+        to_lines = []
+        to_positions = []
+        
+        for line in connection_lines:
+            if line.startswith("from") and line.find(" to ") != -1:
+                to_pos = line.find(" to ")
+                to_lines.append(line)
+                to_positions.append(to_pos)
+        
+        # 第二步：找出最大的to位置，作为对齐基准
+        if to_lines:
+            max_to_pos = max(to_positions)
+            
+            # 第三步：对每行进行调整，使所有行的"to"对齐
+            for i, line in enumerate(connection_lines):
+                if line.startswith("from") and line.find(" to ") != -1:
+                    # 分割行，在"from"部分后面添加适当的空格
+                    to_pos = line.find(" to ")
+                    from_part = line[:to_pos]
+                    to_part = line[to_pos:]
+                    # 计算需要添加的空格数，确保to位置对齐
+                    spaces_needed = max_to_pos - to_pos
+                    # 重建行
+                    connection_lines[i] = from_part + " " * spaces_needed + to_part
+        
+        result = "\n".join(connection_lines)
+        return result
 
     def gen_instace_block(self, db: VerilogModuleCollection) -> str:
         """
@@ -226,7 +269,12 @@ class WgenConfigGenerator(CodeGeneratorInterface):
                 src_port_range_str = f"({connection.source_bit_range['high']}:{connection.source_bit_range['low']})" 
                 dst_port_range_str = f"({connection.dest_bit_range['high']}:{connection.dest_bit_range['low']})" 
 
-            connection_lines.append(f"from {connection.source_module_name}.{connection.source_port.name}{src_port_range_str} to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
+            if connection.source_port.name == "tie_0":
+                connection_lines.append(f"from \"all_0\"  to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
+            elif connection.source_port.name == "tie_1":
+                connection_lines.append(f"from \"all_1\"  to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
+            else:
+                connection_lines.append(f"from {connection.source_module_name}.{connection.source_port.name}{src_port_range_str} to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
         connection_lines.append(f" ")
         
         return "\n".join(connection_lines)
