@@ -1,6 +1,7 @@
 from time import sleep
 import tkinter as tk
 import traceback
+import subprocess
 from tkinter import ttk, messagebox, simpledialog, filedialog, scrolledtext
 import copy
 from collections import deque
@@ -310,13 +311,18 @@ class WGenGUI:
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="打开配置文件", command=self._open_config_file)
         file_menu.add_separator()
+
         file_menu.add_command(label="打开Database", command=self._open_database)
         file_menu.add_command(label="保存Database", command=self._user_save_database)
         file_menu.add_separator()
+
         file_menu.add_command(label="增量更新Database", command=self._try_update_database)   
-        file_menu.add_separator()     
-        file_menu.add_command(label="导出wgen_config", command=self._export_wgen_config)        
-        file_menu.add_separator()     
+        file_menu.add_separator()   
+
+        file_menu.add_command(label="导出wgen_config", command=self._export_wgen_config)   
+        file_menu.add_command(label="直接执行sh命令", command=self._execute_sh_command)     
+        file_menu.add_separator()   
+
         file_menu.add_command(label="退出", command=self.root.quit)
         
         # 添加文件按钮
@@ -345,6 +351,36 @@ class WGenGUI:
         help_menu.add_command(label="关于", command=self._show_about_info) 
 
         self.root.config(menu=menu_bar)
+    
+    def _execute_sh_command(self):
+        """执行命令并收集输出，通过_scolledtext展示结果"""
+        try:
+            # 根据平台选择命令
+            if sys.platform == 'win32':
+                # Windows
+                cmd :str = "for /l %i in (1,1,100) do echo hello"
+                result = subprocess.run(cmd, shell=True, 
+                                      capture_output=True, text=True, timeout=5)
+            else:
+                # Linux
+                cmd :str = "for ((i=1; i<=100; i++)); do echo \"hello$i\"; done"
+                result = subprocess.run(cmd, shell=True, 
+                                      capture_output=True, text=True, timeout=5)
+            
+            # 收集输出
+            output = f"命令执行结果:\n\n"
+            output += f"标准输出:\n{result.stdout}\n"
+            if result.stderr:
+                output += f"标准错误:\n{result.stderr}\n"
+            output += f"返回码: {result.returncode}"
+            
+            # 使用_show_scolledtext显示结果
+            self._show_scolledtext(output, title="命令执行结果", modal=False)
+            
+        except Exception as e:
+            # 显示错误信息
+            error_message = f"执行命令时出错: {str(e)}"
+            self._show_scolledtext(error_message, title="错误信息", modal=True)
 
     def _undo_last_action(self):
         """撤销最后一次操作按钮的响应函数"""
