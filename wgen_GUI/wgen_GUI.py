@@ -40,7 +40,7 @@ class WGenGUI:
         # 创建模块集合database
         self.collection_DB:VerilogModuleCollection = None
         # 初始化一个大小为1024的栈，用于存放collection_DB的历史副本
-        self.connections_DB_stack: deque[VerilogModuleCollection] = deque(maxlen=1024)
+        self.collection_DB_stack: deque[VerilogModuleCollection] = deque(maxlen=1024)
 
         # 存储缩放相关的属性
         self.master_scale = 1.0  # Master电路图的缩放比例
@@ -48,14 +48,21 @@ class WGenGUI:
         self.selected_canvas = None  # 当前选中的canvas
         
         # 添加空格键快捷键来触发创建连接操作
-        # 使用bind_all确保无论焦点在哪个控件上，快捷键都能响应
         # 添加return "break"防止事件冒泡，确保事件被正确处理
         def on_space_press(event):
             print("space！")
             self._create_connection()
             return "break"  # 防止事件冒泡
+
+        # 添加ctrl+z快捷键来触发撤销操作
+        def on_ctrl_z(event):
+            print("ctrl+z！")
+            self._undo_last_action()
+            return "break"  # 防止事件冒泡
         
+        # 使用bind_all确保无论焦点在哪个控件上，快捷键都能响应
         self.root.bind_all('<space>', on_space_press)
+        self.root.bind_all('<Control-z>', on_ctrl_z)
         # 确保根窗口能接收键盘事件
         self.root.focus_set()
         
@@ -318,6 +325,9 @@ class WGenGUI:
         # 添加创建连接按钮
         menu_bar.add_command(label="创建连接", command=self._create_connection)
 
+        # 添加撤销操作按钮
+        menu_bar.add_command(label="撤销", command=self._undo_last_action)
+
         # 添加查询菜单
         query_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="查询", menu=query_menu)
@@ -330,11 +340,39 @@ class WGenGUI:
         help_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="帮助", menu=help_menu)
         help_menu.add_command(label="配置文件示例", command= lambda: self._show_scolledtext(VerilogParser._yaml_example, "配置文件示例", False)) 
-        help_menu.add_command(label="快捷键列表", command= lambda: messagebox.showinfo("快捷键列表", "空格：创建连接\n"))  
+        help_menu.add_command(label="快捷键列表", command= lambda: messagebox.showinfo("快捷键列表", "Space   : Create Connection.\nCtrl+Z  : Undo Last Operation."))  
         help_menu.add_separator()
         help_menu.add_command(label="关于", command=self._show_about_info) 
 
         self.root.config(menu=menu_bar)
+
+    def _undo_last_action(self):
+        """撤销最后一次操作按钮的响应函数"""
+        if messagebox.askyesno("确认撤销", "确认撤销最后一次操作吗？"):
+            if self.collection_DB_stack is not None and len(self.collection_DB_stack) > 1:
+                print("before undo, stack size:", len(self.collection_DB_stack))
+                self.collection_DB_stack.pop()
+
+                # 撤销操作后，self.collection_DB为上一个stack的栈顶
+                stk_top = self.collection_DB_stack[-1] 
+                # 深拷贝栈顶元素，避免修改原DB
+                self.collection_DB = copy.deepcopy(stk_top)
+
+                self.modules = self.collection_DB.modules
+                self.master_module = self.collection_DB.get_module(self.master_module.name)
+                self.slave_module = self.collection_DB.get_module(self.slave_module.name)
+
+                print("after undo, stack size:", len(self.collection_DB_stack))
+                Toast(self.root, "撤销成功", duration=2000, position='center')
+                self._update_modules_list()
+                self._update_hierarchy_view()
+                self._update_master_display()
+                self._update_slave_display()
+
+            else:
+                Toast(self.root, "没有可撤销的操作", duration=2000, position='center')
+        else:
+            Toast(self.root, "点击了取消", duration=2000, position='center')
 
     def _query_connections_by_instance_name(self):
         """根据实例名查询连接信息的辅助方法"""
@@ -536,6 +574,8 @@ class WGenGUI:
             try:
                 # 使用FileHandler加载数据库文件
                 self.collection_DB = self.file_handler.load_database(file_path)
+                # stack push 进去DB的深拷贝，后续撤销操作时使用
+                self.collection_DB_stack.append( copy.deepcopy(self.collection_DB))
                 
                 # 显示加载成功信息
                 show_str = f"Database已从 {file_path} 加载成功！！"
@@ -592,7 +632,7 @@ class WGenGUI:
                 save_result = self.file_handler.save_database(
                     self.collection_DB, 
                     file_path, 
-                    self.connections_DB_stack,
+                    self.collection_DB_stack,
                     version or self.version
                 )
                 if save_result:

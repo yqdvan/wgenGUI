@@ -84,13 +84,13 @@ class FileHandler:
         except Exception as e:
             raise Exception(f"加载数据库失败: {str(e)}")
             
-    def save_database(self, collection_DB, file_path=None, connections_DB_stack=None, version=None):
+    def save_database(self, collection_DB, file_path=None, collection_DB_stack=None, version=None):
         """深拷贝collection_DB并保存为时间戳命名的json文件到sessions目录
         
         参数:
             collection_DB: 要保存的模块集合数据库
             file_path (str or None): 数据库文件路径，为None时使用默认路径
-            connections_DB_stack (deque or None): 连接历史栈，用于保存历史记录
+            collection_DB_stack (deque or None): 连接历史栈，用于保存历史记录
             version (str): 可选的软件版本信息
             
         返回:
@@ -134,8 +134,8 @@ class FileHandler:
             if save_success:
                 success_message = f"数据库已成功保存到:\n{file_path}"
                 # 如果提供了连接栈，则添加到栈中
-                if connections_DB_stack is not None:
-                    connections_DB_stack.append(db_copy)
+                if collection_DB_stack is not None:
+                    collection_DB_stack.append(db_copy)
                 return success_message
             else:
                 raise Exception("保存数据库失败")
