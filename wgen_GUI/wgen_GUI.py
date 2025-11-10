@@ -276,9 +276,9 @@ class WGenGUI:
         # 创建端口右键菜单
         self.port_menu = tk.Menu(self.root, tearoff=0)
         self.port_menu.add_command(label="断开连接", command=lambda: self._port_menu_action("optionA", self.current_tree))
-        self.port_menu.add_command(label="optionB", command=lambda: self._port_menu_action("optionB", self.current_tree))
         self.port_menu.add_separator()
-        self.port_menu.add_command(label="属性", command=lambda: self._port_menu_action("optionC", self.current_tree))
+        self.port_menu.add_command(label="tie 0", command=lambda: self._port_menu_action("optionB", self.current_tree))
+        self.port_menu.add_command(label="tie 1", command=lambda: self._port_menu_action("optionC", self.current_tree))
         
         # Slave下方 - 电路示意图
         slave_schematic_frame = ttk.LabelFrame(slave_paned, text="Slave电路示意图")
@@ -341,7 +341,7 @@ class WGenGUI:
         if self.collection_DB is None:
             messagebox.showerror("错误", "请先打开Database!")
             return
-                    
+
         instance_name = simpledialog.askstring(
             "查询连接信息", 
             "                根据实例名查询连接信息                \n                    请输入实例名："
@@ -844,8 +844,8 @@ class WGenGUI:
             self._update_master_display()
             self._update_slave_display()
 
-        elif tree_type == "master" and action == "optionC":
-            messagebox.showinfo("操作提示", f"正在开发，敬请期待！")
+        elif tree_type == "master" and (action == "optionB" or action == "optionC"):
+            messagebox.showinfo("操作提示", f"Master output cannot be tied to {action}")
         elif tree_type == "slave" and action == "optionA":  
             port_obj = self.slave_module.get_port(port_name)
             if port_obj:
