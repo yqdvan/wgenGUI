@@ -474,7 +474,7 @@ class VerilogModuleCollection:
                         unconnected_gen_ports.append(port)
             else:
                 for port in module.ports:
-                    if not port.source or len(port.destinations) == 0:
+                    if not ( not port.source or len(port.destinations) == 0 ): # 只要有一个连上就行
                         unconnected_non_gen_ports.append(port)
 
         ans_str = ""
