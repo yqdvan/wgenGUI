@@ -474,8 +474,14 @@ class VerilogModuleCollection:
                         unconnected_gen_ports.append(port)
             else:
                 for port in module.ports:
-                    if not ( not port.source or len(port.destinations) == 0 ): # 只要有一个连上就行
-                        unconnected_non_gen_ports.append(port)
+                    if port.direction == "input" :
+                        if not port.source :
+                            unconnected_non_gen_ports.append(port)
+                    elif port.direction == "output":
+                        if len(port.destinations) == 0:
+                            unconnected_non_gen_ports.append(port)
+                    else: # inout
+                        ans_str += f"iinot port: {port.get_port_info()} \n"
 
         ans_str = ""
         if unconnected_gen_ports:
@@ -488,9 +494,9 @@ class VerilogModuleCollection:
         if unconnected_non_gen_ports:
             # unconnected_non_gen_ports按照端口direction排序
             unconnected_non_gen_ports.sort(key=lambda port: port.direction)
-            ans_str += "未连接常规module 端口:\n" + "\n".join(port.get_port_info() for port in unconnected_non_gen_ports) + "\n"
+            ans_str += "\n未连接常规module 端口:\n" + "\n".join(port.get_port_info() for port in unconnected_non_gen_ports) + "\n"
         else:
-            ans_str += "所有常规module端口均已连接\n"
+            ans_str += "\n所有常规module端口均已连接\n"
         
         return ans_str
 
