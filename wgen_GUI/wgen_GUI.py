@@ -367,8 +367,8 @@ class WGenGUI:
                 result = subprocess.run(cmd, shell=True, 
                                       capture_output=True, text=True, timeout=5)
             
+            output :str = f"命令:\n{cmd}\n\n"  
             # 收集输出
-            output = f"命令执行结果:\n\n"
             output += f"标准输出:\n{result.stdout}\n"
             if result.stderr:
                 output += f"标准错误:\n{result.stderr}\n"
