@@ -418,11 +418,11 @@ class VerilogModuleCollection:
         tie_port: VerilogPort = self.tie_0_port if tie01 == 0 else self.tie_1_port
 
         if(port.direction == "output"):
-            ans_str += f"错误：Tie-0/1端口不能连接到输出端口{port.name}\n"
+            ans_str = f"错误：Tie-0/1端口不能连接到输出端口{port.name}\n"
             return ans_str
         
         if(port.direction == "input") and port.source is not None:
-            ans_str += f"错误：Tie-0/1端口不能连接到已连接的输入端口{port.name}\n"
+            ans_str = f"错误：Tie-0/1端口不能连接到已连接的输入端口{port.name}\n"
             return ans_str
 
         """将Tie-0/1端口连接到指定端口"""
