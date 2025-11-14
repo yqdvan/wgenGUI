@@ -451,9 +451,9 @@ class WGenGUI:
             messagebox.showerror("错误", f"导出wgen_config时发生错误: {str(e)}")
             return
 
-        need_messagebox = True
+        need_messagebox = False
         if file_path is None:
-            need_messagebox = False
+            need_messagebox = True
             # 打开文件保存交互窗口，询问用户保存文件的名字与路径
             file_path = filedialog.asksaveasfilename(
                 title="保存wgen_config",
