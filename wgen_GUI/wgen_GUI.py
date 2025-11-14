@@ -358,13 +358,13 @@ class WGenGUI:
             # 根据平台选择命令
             if sys.platform == 'win32':
                 # Windows
-                cmd :str = "for /l %i in (1,1,100) do echo hello"
+                cmd :str = "for /l %i in (1,1,20) do echo hello \n echo error test \n echo warn test \n echo info test"
                 result = subprocess.run(cmd, shell=True, 
                                       capture_output=True, text=True, timeout=5)
             else:
                 # Linux
                 self._export_wgen_config("/tmp/wgen_config.config")
-                cmd :str = "for ((i=1; i<=100; i++)); do echo \"hello$i\"; done"
+                cmd :str = "for ((i=1; i<=20; i++)); do echo \"hello$i\"; done"
                 result = subprocess.run(cmd, shell=True, 
                                       capture_output=True, text=True, timeout=5)
             
@@ -450,8 +450,10 @@ class WGenGUI:
         except Exception as e:
             messagebox.showerror("错误", f"导出wgen_config时发生错误: {str(e)}")
             return
-        
+
+        need_messagebox = True
         if file_path is None:
+            need_messagebox = False
             # 打开文件保存交互窗口，询问用户保存文件的名字与路径
             file_path = filedialog.asksaveasfilename(
                 title="保存wgen_config",
@@ -464,7 +466,10 @@ class WGenGUI:
             try:
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(wgen_config_txt)
-                messagebox.showinfo("成功", f"wgen_config 已成功保存到:\n{file_path}")
+                if need_messagebox is True:
+                    messagebox.showinfo("成功", f"wgen_config 已成功保存到:\n{file_path}")
+                else:
+                    Toast(self.root, f"wgen_config 已成功保存到:\n{file_path}", duration=2000, position='bottom')
             except Exception as e:
                 messagebox.showerror("错误", f"保存wgen_config时发生错误: {str(e)}")
         else:
@@ -1277,7 +1282,31 @@ class WGenGUI:
         # 创建可滚动文本框
         text_area = scrolledtext.ScrolledText(result_window, wrap=tk.WORD, width=70, height=15, font=("SimHei", 10))
         text_area.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
-        text_area.insert(tk.END, text)
+        
+        # 逐行插入文本并设置颜色
+        lines = text.split('\n')
+        for i, line in enumerate(lines):
+            text_area.insert(tk.END, line)
+            
+            # 检查行内容并设置颜色
+            line_lower = line.lower()
+            if 'error' in line_lower:
+                # 设置整行为红色
+                text_area.tag_add(f"error_line_{i}", f"{i+1}.0", f"{i+1}.end")
+                text_area.tag_config(f"error_line_{i}", foreground="red")
+            elif 'warn' in line_lower:
+                # 设置整行为黄色
+                text_area.tag_add(f"warn_line_{i}", f"{i+1}.0", f"{i+1}.end")
+                text_area.tag_config(f"warn_line_{i}", foreground="orange")
+            elif 'info' in line_lower:
+                # 设置整行为绿色
+                text_area.tag_add(f"info_line_{i}", f"{i+1}.0", f"{i+1}.end")
+                text_area.tag_config(f"info_line_{i}", foreground="green")
+            
+            # 如果不是最后一行，添加换行符
+            if i < len(lines) - 1:
+                text_area.insert(tk.END, '\n')
+        
         text_area.config(state=tk.DISABLED)  # 设置为只读
         
         # 添加关闭按钮
@@ -1314,20 +1343,20 @@ class WGenGUI:
         弹出一个消息框，显示本软件的著作权、基本功能、版本等信息
         """
         about_message = f"""
-                        WGenGUI 版本 {self.version}
+         WGenGUI 版本 {self.version}
 
-        著作权所有 © 2025
+    著作权所有 © 2025
 
-        基本功能：
-            - 模块互联层次结构展示
-            - Master/Slave模块端口连接管理                         
-            - 电路示意图可视化显示
-            - 支持画布缩放和拖动功能
-            - 端口连接状态管理
-            - 所有连接信息查询
-            - 支持模块信息批量更新
+    基本功能：
+        - 模块互联层次结构展示
+        - Master/Slave模块端口连接管理      
+        - 电路示意图可视化显示
+        - 支持画布缩放和拖动功能
+        - 端口连接状态管理
+        - 所有连接信息查询
+        - 支持模块信息批量更新
 
-        感谢使用本软件！
+    感谢使用本软件！
         """
         tk.messagebox.showinfo("关于 WGenGUI", about_message)
 
