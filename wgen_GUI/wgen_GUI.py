@@ -363,6 +363,7 @@ class WGenGUI:
                                       capture_output=True, text=True, timeout=5)
             else:
                 # Linux
+                self._export_wgen_config("/tmp/wgen_config.config")
                 cmd :str = "for ((i=1; i<=100; i++)); do echo \"hello$i\"; done"
                 result = subprocess.run(cmd, shell=True, 
                                       capture_output=True, text=True, timeout=5)
@@ -439,7 +440,7 @@ class WGenGUI:
         # messagebox.showinfo("未连接端口", "未连接端口信息：\n" + self.collection_DB.get_unconnected_ports_info())
         self._show_scolledtext( self.collection_DB.get_unconnected_ports_info(), "未连接端口信息", False)
 
-    def _export_wgen_config(self):
+    def _export_wgen_config(self, file_path: str = None):
         """导出wgen_config按钮的响应函数"""
         # 弹出确认对话框
         generator = WgenConfigGenerator()
@@ -449,12 +450,14 @@ class WGenGUI:
         except Exception as e:
             messagebox.showerror("错误", f"导出wgen_config时发生错误: {str(e)}")
             return
-        # 打开文件保存交互窗口，询问用户保存文件的名字与路径
-        file_path = filedialog.asksaveasfilename(
-            title="保存wgen_config",
-            defaultextension=".txt",
-            filetypes=[("文本文件", "*.config"), ("所有文件", "*.*")]
-        )
+        
+        if file_path is None:
+            # 打开文件保存交互窗口，询问用户保存文件的名字与路径
+            file_path = filedialog.asksaveasfilename(
+                title="保存wgen_config",
+                defaultextension=".config",
+                filetypes=[("文本文件", "*.config"), ("所有文件", "*.*")]
+            )
 
         # 如果用户选择了文件路径，则保存wgen_config_txt
         if file_path:
