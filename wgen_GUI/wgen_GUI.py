@@ -340,6 +340,11 @@ class WGenGUI:
         query_menu.add_command(label="未连接端口", command=self._show_unconnected_ports_info)
         query_menu.add_command(label="所有连接", command=self._show_all_connnections_info)
         query_menu.add_separator()
+
+        query_menu.add_command(label="Tie-0端口", command=lambda: self._show_tie_ports_info(0))
+        query_menu.add_command(label="Tie-1端口", command=lambda: self._show_tie_ports_info(1))
+        query_menu.add_separator()
+
         query_menu.add_command(label="根据实例名", command=self._query_connections_by_instance_name)
         
         # 添加帮助菜单
@@ -352,6 +357,19 @@ class WGenGUI:
 
         self.root.config(menu=menu_bar)
     
+    
+    def _show_tie_ports_info(self, tie01 :int =0):
+        """显示Tie-0/1端口信息"""
+        tie_port = self.collection_DB.tie_0_port if tie01 == 0 else self.collection_DB.tie_1_port
+        if tie_port is None:
+            messagebox.showerror("错误", "请先打开Database!")
+            return
+            
+        show_str = ""
+        for port in tie_port.destinations:
+            show_str += f"{port.get_port_info()}\n"
+        self._show_scolledtext( show_str, f"Tie-{tie01}端口信息", False)        
+
     def _execute_sh_command(self):
         """执行命令并收集输出，通过_scolledtext展示结果"""
         try:
