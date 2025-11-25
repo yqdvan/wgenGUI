@@ -513,7 +513,7 @@ class WGenGUI:
                 messagebox.showwarning("Warning", "未选择YAML config文件！")
                 return
             # 增量更新数据库
-            modules:VerilogModule = self.file_handler.load_config_file(file_path, self.parser)
+            modules:list[VerilogModule] = self.file_handler.load_config_file(file_path, self.parser)
             ans_str = self.collection_DB.update_module(modules)
             
             # 使用可滚动文本框显示详细信息

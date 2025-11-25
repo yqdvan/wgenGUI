@@ -373,13 +373,13 @@ class VerilogConnection:
     def __str__(self):
         """返回连接的字符串表示"""
         # 构建源端口位范围字符串
-        if self.source_bit_range['high'] == self.source_bit_range['low'] and self.source_bit_range['high'] == 0:
+        if self.source_bit_range['high'] == self.source_bit_range['low'] and self.source_bit_range['high'] == 0 and self.source_port.get_width_value() == 1:
             source_range_str = ''
         else:
             source_range_str = f"[{self.source_bit_range['high']}:{self.source_bit_range['low']}]"
         
         # 构建目标端口位范围字符串
-        if self.dest_bit_range['high'] == self.dest_bit_range['low'] and self.dest_bit_range['high'] == 0:
+        if self.dest_bit_range['high'] == self.dest_bit_range['low'] and self.dest_bit_range['high'] == 0 and self.dest_port.get_width_value() == 1:
             dest_range_str = ''
         else:
             dest_range_str = f"[{self.dest_bit_range['high']}:{self.dest_bit_range['low']}]"
@@ -581,6 +581,10 @@ class VerilogModuleCollection:
         for module in md_list:
             self_md: VerilogModule = self.get_module(module.name)
             if self_md is not None and module.ports is not None and self_md.ports is not None:
+                # 2.1 更新parameters
+                self_md.parameters = module.parameters.copy()
+
+                # 2.2 找可能新和改动的port
                 for port in module.ports:
                     if port.name not in [p.name for p in self_md.ports]:
                         # 端口不存在，添加端口
@@ -600,7 +604,23 @@ class VerilogModuleCollection:
                         ans_str += self.delete_port_connection(self_md, self_port)
                     else:
                         # 端口已存在，位宽也相等，不进行添加操作
-                        ans_str += f"VerilogModule {module.name} port {port.name} has no change;\n"
+                        # ans_str += f"VerilogModule {module.name} port {port.name} has no change;\n"
+                        print(f"VerilogModule {module.name} port {port.name} has no change;")
+            
+                # 2.3 找可能删除了的端口
+                del_port_list: list[VerilogPort] = []
+                for self_port in self_md.ports:
+                    if self_port.name not in [p.name for p in module.ports]:
+                        # 端口不存在，删除端口
+                        del_port_list.append(self_port)
+                    else:
+                        # 端口已存在，不进行删除操作
+                        print(f"VerilogModule {module.name} port {self_port.name} not need delete;")
+                if del_port_list:
+                    for self_port in del_port_list:
+                        ans_str += self.delete_port_connection(self_md, self_port)  
+                        ans_str += f"VerilogModule {module.name} port {self_port.name} delete success;\n"
+                        self_md.ports.remove(self_port)
             ans_str += "\n"
 
         # 3. 处理md_list中没有，而self.modules中有的module
