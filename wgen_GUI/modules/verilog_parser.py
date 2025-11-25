@@ -73,6 +73,16 @@ modules:
                         # 添加输出端口
                         module_obj.add_ports(portParser.get_output_ports())
                         
+                        # 从module_info中获取paramters字段，如果不为空就递归寻找其内部的par_name 和par_value 放入到 module_obj中的parameters字段
+                        if 'parameters' in module_info:
+                            for param in module_info['parameters']:
+                                # 在module_obj的parameters字典中找 param['par_name']字段，并把值用param['par_value']替换
+                                if param['par_name'] in module_obj.parameters:
+                                    module_obj.parameters[param['par_name']] = param['par_value']
+                                else:
+                                    # 报错，参数名不在module_obj的parameters字段中
+                                    messagebox.showerror("错误", f"参数名 {param['par_name']} 不在模块 {ins_name} 的参数列表中")
+                                
                         # 添加到模块列表
                         modules_ans.append(module_obj)
                 
