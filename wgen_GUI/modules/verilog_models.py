@@ -373,13 +373,13 @@ class VerilogConnection:
     def __str__(self):
         """返回连接的字符串表示"""
         # 构建源端口位范围字符串
-        if self.source_bit_range['high'] == self.source_bit_range['low']:
+        if self.source_bit_range['high'] == self.source_bit_range['low'] and self.source_bit_range['high'] == 0:
             source_range_str = ''
         else:
             source_range_str = f"[{self.source_bit_range['high']}:{self.source_bit_range['low']}]"
         
         # 构建目标端口位范围字符串
-        if self.dest_bit_range['high'] == self.dest_bit_range['low']:
+        if self.dest_bit_range['high'] == self.dest_bit_range['low'] and self.dest_bit_range['high'] == 0:
             dest_range_str = ''
         else:
             dest_range_str = f"[{self.dest_bit_range['high']}:{self.dest_bit_range['low']}]"

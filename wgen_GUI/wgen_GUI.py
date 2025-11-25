@@ -11,6 +11,7 @@ from modules.file_handler import FileHandler
 from modules.toast import Toast
 from modules.wgen_config_generator import WgenConfigGenerator
 from tkinter import ttk
+import re
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
@@ -569,21 +570,32 @@ class WGenGUI:
                     # 弹出窗口让用户输入端口宽度
                     new_width = simpledialog.askstring(
                         "源端口宽度大于目标端口宽度",
-                        f"端口 {from_port_obj.name} 宽度为 {from_bit_range}，端口 {to_port_obj.name} 宽度为 {to_bit_range}。\n请输入源端口范围（格式如 [high:low]）："
+                        f"端口 {from_port_obj.name} 宽度为 {from_bit_range}，端口 {to_port_obj.name} 宽度为 {to_bit_range}。\n请输入源端口范围（格式如 [high:low] ）："
                     )
                     if new_width:
                         try:
                             # 解析用户输入的宽度
-                            high, low = map(int, new_width.strip('[]').split(':'))
+                            # 如果输入是\d+ (即一个或多个数字),则high 和 low都等于这个值
+                            print(f"new_width: {new_width}")
+                            if re.match(r'[0-9]+', new_width):
+                                high = low = int(new_width)
+                            else:
+                                high, low = map(int, new_width.strip('[]').split(':'))
+
+                            if(from_bit_range['high'] < high or from_bit_range['low'] > low):
+                                messagebox.showerror("错误", f"端口 {from_port_obj.name} 宽度为 {from_bit_range}，输入的端口范围 [{high}:{low}] 超出了端口范围！")
+                                return
+                            
                             from_bit_range = {'high': high, 'low': low}
                             if (from_bit_range['high'] - from_bit_range['low']) != (to_bit_range['high'] - to_bit_range['low']):
                                 messagebox.showerror("错误", f"端口位宽仍然不匹配，请重新操作！{from_bit_range},{to_bit_range}")
                                 return
-     
-                        except Exception:
-                            messagebox.showerror("错误", "输入的端口宽度格式不正确，请使用 [high:low] 格式！")
+
+                        except Exception as e:
+                            messagebox.showerror("错误", "输入的端口宽度格式不正确，请使用 [high:low] 格式！"+str(e))
                             return
                     else:
+                        Toast(self.root, "用户取消输入，退出连接操作", duration=2000, position='center')
                         return  # 用户取消输入，退出连接操作
 
                 self.collection_DB.connect_port(from_port_obj, to_port_obj, from_bit_range, to_bit_range)
