@@ -68,6 +68,8 @@ modules:
                         # 直接创建VerilogModule对象
                         module_obj = VerilogModule(name=ins_name, file_path=portParser.file_path, module_def_name=module_def_name)
                         
+                        # 添加portParser.parameters的copy到module_obj.parameters
+                        module_obj.parameters = portParser.parameters.copy()
                         # 添加输入端口
                         module_obj.add_ports(portParser.get_input_ports())
                         # 添加输出端口
@@ -238,7 +240,6 @@ class VerilogPortParser:
         if file_path:
             self.parse_file(file_path)
     
-    
     def parse_file(self, file_path=None):
         """
         解析Verilog文件，提取端口信息
@@ -303,8 +304,6 @@ class VerilogPortParser:
         # 确定Verilog代码风格并提取端口信息
         self._extract_ports_by_style(content)
 
-
-
     def _extract_parameters(self, par_content):
         """
         从parameter定义字符串中提取所有parameter名称与默认值
@@ -358,7 +357,6 @@ class VerilogPortParser:
         result.append(text[start:])
         return result
 
-    
     def _extract_module_name(self, content):
         """提取模块名和参数信息"""
         # 匹配模块定义行（支持带有参数的模块定义）
@@ -496,7 +494,6 @@ class VerilogPortParser:
                 port = VerilogPort(name=port_name, direction=direction, width=width)
                 self.ports.append(port)
     
-
     def _trans_bit_range_by_str(self, high_or_low_str:str) -> int:
         """将位宽字符串转换为位宽数值
         支持简单的计算公式，公式中的变量值来自parameters
@@ -537,7 +534,6 @@ class VerilogPortParser:
         
         # 默认返回0
         return 0
-
 
     def _parse_port_line_ansi(self, direction, port_line):
         """解析ANSI风格的端口行"""
