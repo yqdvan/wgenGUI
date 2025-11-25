@@ -287,6 +287,8 @@ class WGenGUI:
         self.port_menu.add_separator()
         self.port_menu.add_command(label="tie 0", command=lambda: self._port_menu_action("optionB", self.current_tree))
         self.port_menu.add_command(label="tie 1", command=lambda: self._port_menu_action("optionC", self.current_tree))
+        self.port_menu.add_separator()
+        self.port_menu.add_command(label="cancel", command=lambda: self._port_menu_action("optionD", self.current_tree))
         
         # Slave下方 - 电路示意图
         slave_schematic_frame = ttk.LabelFrame(slave_paned, text="Slave电路示意图")
@@ -356,7 +358,6 @@ class WGenGUI:
         help_menu.add_command(label="关于", command=self._show_about_info) 
 
         self.root.config(menu=menu_bar)
-    
     
     def _show_tie_ports_info(self, tie01 :int =0):
         """显示Tie-0/1端口信息"""
@@ -948,6 +949,7 @@ class WGenGUI:
 
         elif tree_type == "master" and (action == "optionB" or action == "optionC"):
             messagebox.showinfo("操作提示", f"Master output cannot be tied to {action}")
+        
         elif tree_type == "slave" and action == "optionA":  
             port_obj = self.slave_module.get_port(port_name)
             if port_obj:
