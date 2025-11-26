@@ -26,7 +26,7 @@ modules:
         self.test_input_ports = ['aa_in', 'bb_in', 'cc_in', 'dd_in', 'rr_in', 'ee_in']
         self.test_output_ports = ['cc_out', 'dd_out']
     
-    def parse_config_file(self, config_file_path):
+    def parse_config_file(self, config_file_path, parse_parameters=False):
         """
         解析配置文件，获取模块名与文件路径的映射关系
         
@@ -60,8 +60,19 @@ modules:
 
                         if not os.path.isfile(filePath):
                             filePath = filePath+ "/" +module_info['module_name']+".v"
-                            
-                        portParser =VerilogPortParser(filePath)
+
+                        yaml_pars = {}
+                        # 从module_info中获取paramters字段，如果不为空就递归寻找其内部的par_name 和par_value 放入到 module_obj中的parameters字段
+                        if 'parameters' in module_info:
+                            for param in module_info['parameters']:
+                                # 在module_obj的parameters字典中找 param['par_name']字段，并把值用param['par_value']替换
+                                yaml_pars[param['par_name']] = param['par_value']
+
+                        if yaml_pars and parse_parameters:
+                            portParser =VerilogPortParser(filePath, yaml_pars)
+                        else:
+                            portParser =VerilogPortParser(filePath)
+
                         ins_name = module_info.get('ins_name')
                         module_def_name = module_info.get('module_name')
 
@@ -75,16 +86,7 @@ modules:
                         # 添加输出端口
                         module_obj.add_ports(portParser.get_output_ports())
                         
-                        # 从module_info中获取paramters字段，如果不为空就递归寻找其内部的par_name 和par_value 放入到 module_obj中的parameters字段
-                        if 'parameters' in module_info:
-                            for param in module_info['parameters']:
-                                # 在module_obj的parameters字典中找 param['par_name']字段，并把值用param['par_value']替换
-                                if param['par_name'] in module_obj.parameters:
-                                    module_obj.parameters[param['par_name']] = param['par_value']
-                                else:
-                                    # 报错，参数名不在module_obj的parameters字段中
-                                    messagebox.showerror("错误", f"参数名 {param['par_name']} 不在模块 {ins_name} 的参数列表中")
-                                
+       
                         # 添加到模块列表
                         modules_ans.append(module_obj)
                 
@@ -224,23 +226,29 @@ modules:
 class VerilogPortParser:
     """Verilog端口解析器，用于解析Verilog文件中的module输入输出端口信息"""
     
-    def __init__(self, file_path=None):
+    def __init__(self, file_path=None, pars = {}):
         """
         初始化Verilog端口解析器
         
         参数:
             file_path (str, optional): Verilog文件路径
+            pars (dict, optional): 模块参数，用于解析参数化模块的端口位宽
         """
         self.file_path = file_path
         self.module_name = None
         self.ports: list[VerilogPort] = []  # 存储解析出的端口信息，使用VerilogPort对象
-        self.parameters = {}  # 存储模块参数
+        self.parameters = pars  # 存储模块参数
         
+        if pars:
+            self.parameters = pars  # 存储模块参数
+            self.parse_parameters = True
+        else:
+            self.parse_parameters = False
         # 如果提供了文件路径，则立即解析
         if file_path:
-            self.parse_file(file_path)
+            self.parse_file(file_path, self.parse_parameters)
     
-    def parse_file(self, file_path=None):
+    def parse_file(self, file_path=None, parse_parameters=True):
         """
         解析Verilog文件，提取端口信息
         
@@ -264,7 +272,8 @@ class VerilogPortParser:
         
         # 重置解析结果
         self.ports = []
-        self.parameters = {}  # 重置参数
+        if parse_parameters is False:
+            self.parameters = {}  # 重置参数
         self.module_name = None
         
         # 在进行content分析之前，先把注释内容和空白行一律删除
@@ -294,9 +303,14 @@ class VerilogPortParser:
             par_content = ''
             port_content = head_content
 
-        if par_content:
+        if parse_parameters and par_content:
             # 提取参数信息
-            self._extract_parameters(par_content)
+            ans_pars:dict = self._extract_parameters(par_content)
+            if ans_pars:
+                # 遍历ans_pars 字典，如果self parameters中没有的字，要添加到self parameters中
+                for par in ans_pars:
+                    if par not in self.parameters:
+                        self.parameters[par] = ans_pars[par]
 
         # 提取模块名和参数
         self._extract_module_name(port_content)
@@ -304,7 +318,7 @@ class VerilogPortParser:
         # 确定Verilog代码风格并提取端口信息
         self._extract_ports_by_style(content)
 
-    def _extract_parameters(self, par_content):
+    def _extract_parameters(self, par_content) -> dict:
         """
         从parameter定义字符串中提取所有parameter名称与默认值
         支持如下形式：
@@ -320,6 +334,7 @@ class VerilogPortParser:
         # 简单处理：先按顶层逗号切分，再恢复括号内的逗号
         pieces = self._split_top_level(inner, ',')
 
+        ans_pars = {}
         for piece in pieces:
             piece = piece.strip()
             if not piece:
@@ -336,7 +351,9 @@ class VerilogPortParser:
             vec, name, value = m.groups()
             # 去掉value末尾可能多余的分号
             value = value.rstrip(';').strip()
-            self.parameters[name] = value
+            ans_pars[name] = value
+
+        return ans_pars
 
     def _split_top_level(self, text, sep):
         """

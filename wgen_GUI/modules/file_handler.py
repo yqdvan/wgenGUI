@@ -3,6 +3,7 @@ import sys
 import copy
 import datetime
 import json
+from modules.verilog_parser import VerilogParser
 
 # 添加lib目录到Python路径
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'lib'))
@@ -29,7 +30,7 @@ class FileHandler:
         )
         return file_path
         
-    def load_config_file(self, file_path, parser):
+    def load_config_file(self, file_path, parser:VerilogParser, parse_parameters=False):
         """加载配置文件并解析
         
         参数:
@@ -44,7 +45,7 @@ class FileHandler:
         """
         try:
             # 解析配置文件
-            modules = parser.parse_config_file(file_path)
+            modules = parser.parse_config_file(file_path, parse_parameters)
             return modules
         except Exception as e:
             raise Exception(f"加载配置文件失败: {str(e)}")
