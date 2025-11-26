@@ -1100,6 +1100,9 @@ class VerilogModuleCollection:
         collection.system_module.add_port(collection.tie_0_port)
         collection.system_module.add_port(collection.tie_1_port)    
         
+        # 将system_module添加到module_map中，确保tie01连接能够正确恢复
+        module_map[collection.system_module.name] = collection.system_module
+        
         # 建立模块之间的引用关系（includes和top_module）
         for module_info in data_dict.get('modules', []):
             module = module_info['__module_object']
@@ -1123,14 +1126,49 @@ class VerilogModuleCollection:
         # 然后重建所有连接
         for conn_info in data_dict.get('connections', []):
             try:
+                # 特殊处理tie01连接
+                source_module_name = conn_info['source_module_name']
+                source_port_name = conn_info['source_port_name']
+                dest_module_name = conn_info['dest_module_name']
+                dest_port_name = conn_info['dest_port_name']
+                source_bit_range = conn_info.get('source_bit_range')
+                dest_bit_range = conn_info.get('dest_bit_range')
+                
+                # 如果是tie01端口的连接，直接创建连接对象
+                if source_module_name == collection.system_module.name and source_port_name in ['tie_0', 'tie_1']:
+                    # 获取源端口
+                    source_port = collection.tie_0_port if source_port_name == 'tie_0' else collection.tie_1_port
+                    
+                    # 获取目标模块和端口
+                    dest_module = module_map.get(dest_module_name)
+                    if dest_module:
+                        dest_port = dest_module.get_port(dest_port_name)
+                        if dest_port:
+                            # 直接创建连接对象
+                            connection = VerilogConnection(
+                                source_module=collection.system_module,
+                                source_port=source_port,
+                                dest_module=dest_module,
+                                dest_port=dest_port,
+                                source_bit_range=source_bit_range,
+                                dest_bit_range=dest_bit_range
+                            )
+                            collection.connections.append(connection)
+                            
+                            # 更新端口的源和目的地信息
+                            if dest_port not in source_port.destinations:
+                                source_port.destinations.append(dest_port)
+                            dest_port.source = source_port
+                            continue
+                
                 # 使用现有的add_connection方法来确保所有验证和引用都正确设置
                 collection.add_connection(
-                    source_module_name=conn_info['source_module_name'],
-                    source_port_name=conn_info['source_port_name'],
-                    dest_module_name=conn_info['dest_module_name'],
-                    dest_port_name=conn_info['dest_port_name'],
-                    source_bit_range=conn_info.get('source_bit_range'),
-                    dest_bit_range=conn_info.get('dest_bit_range')
+                    source_module_name=source_module_name,
+                    source_port_name=source_port_name,
+                    dest_module_name=dest_module_name,
+                    dest_port_name=dest_port_name,
+                    source_bit_range=source_bit_range,
+                    dest_bit_range=dest_bit_range
                 )
             except Exception as e:
                 # 如果连接创建失败，打印错误信息但继续处理其他连接
