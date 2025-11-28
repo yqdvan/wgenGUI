@@ -391,6 +391,7 @@ class WGenGUI:
                 # Linux
                 self._export_wgen_config("/tmp/wgen_config.config")
                 cmd :str = "for ((i=1; i<=20; i++)); do echo \"hello$i\"; done"
+                cmd :str = "wgen /tmp/wgen_config.config"
                 result = subprocess.run(cmd, shell=True, 
                                       capture_output=True, text=True, timeout=5)
             
@@ -859,7 +860,10 @@ class WGenGUI:
                             connect_show = port.destinations[0].father_module.name + "." + port.destinations[0].name + "...(" + str(len(port.destinations)) + " more lines)"
                         else:
                             connect_show = port.destinations[0].father_module.name + "." + port.destinations[0].name
-                    self.master_ports_tree.insert('', tk.END, values=(port.name,width_show, connect_show), open=True)
+                    # 根据端口方向设置背景色：input淡蓝，output默认
+                    bg_color = 'lightblue' if port.direction == 'input' else ''
+                    self.master_ports_tree.insert('', tk.END, values=(port.name, width_show, connect_show), open=True, tags=(port.direction,))
+                    self.master_ports_tree.tag_configure(port.direction, background=bg_color)
                 else:
                     messagebox.showerror("错误", f"端口 {port.name} 不是 VerilogPort 类型")
             
@@ -889,7 +893,10 @@ class WGenGUI:
                     connect_show = "None"
                     if port.source:
                         connect_show = port.source.father_module.name + "." + port.source.name
-                    self.slave_ports_tree.insert('', tk.END, values=(port.name,width_show, connect_show)) 
+                    # 根据端口方向设置背景色：input默认，output淡蓝
+                    bg_color = '' if port.direction == 'input' else 'lightblue'
+                    self.slave_ports_tree.insert('', tk.END, values=(port.name,width_show, connect_show), open=True, tags=(port.direction,))
+                    self.slave_ports_tree.tag_configure(port.direction, background=bg_color)
                 else:
                     messagebox.showerror("错误", f"端口 {port.name} 不是 VerilogPort 类型")
             
@@ -1032,15 +1039,6 @@ class WGenGUI:
             show_str = f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}"
             Toast(self.root, show_str, duration=2000, position='center')
 
-        # # 根据操作类型显示不同的消息
-        # if action == "optionA":
-        #     messagebox.showinfo("操作提示", f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}")
-        # elif action == "optionB":
-        #     messagebox.showinfo("操作提示", f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}")
-        # else:
-        #     # 其他操作保持原有逻辑
-        #     messagebox.showinfo("操作提示", f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}")
-    
     def _draw_module_schematic(self, canvas, module):
         """绘制模块电路示意图"""
         # 清空画布
@@ -1054,9 +1052,11 @@ class WGenGUI:
         except:
             # 如果获取失败，使用默认的浅灰色
             fill_color = "#1abc9c"
-        fill_color = "#8aa9c4"
+        fill_color = "#8aa9c4" 
         if module.need_gen:
+            #设置颜色为lightblue
             fill_color = "#99CCFF"
+            fill_color = "#add8e6"
 
         # 获取画布尺寸
         width = canvas.winfo_width()

@@ -25,6 +25,7 @@ class VerilogPort:
             self.width = width
         
         self.source:VerilogPort = source
+        self.connection:VerilogConnection = None # 存储source为多个连接对象时的连接对象
         self.destinations: list[VerilogPort] = []  # 存储多个目标端口
     
     def __str__(self):
@@ -418,8 +419,12 @@ class VerilogModuleCollection:
         tie_port: VerilogPort = self.tie_0_port if tie01 == 0 else self.tie_1_port
 
         if(port.direction == "output"):
-            ans_str = f"错误：Tie-0/1端口不能连接到输出端口{port.name}\n"
-            return ans_str
+            if port.father_module.need_gen is False :
+                ans_str = f"错误：Tie-0/1端口不能连接到输出端口{port.name}\n"
+                return ans_str
+            elif port.source is not None:
+                ans_str = f"错误：Tie-0/1端口不能连接到已连接的端口{port.name}\n"
+                return ans_str
         
         if(port.direction == "input") and port.source is not None:
             ans_str = f"错误：Tie-0/1端口不能连接到已连接的输入端口{port.name}\n"
@@ -979,8 +984,17 @@ class VerilogModuleCollection:
                 port_info = {
                     'name': port.name,
                     'direction': port.direction,
-                    'width': port.width
+                    'width': port.width,
+                    'connection': None
                 }
+                # 序列化connection属性
+                if port.connection:
+                    port_info['connection'] = {
+                        'source_module_name': port.connection.source_module_name,
+                        'source_port_name': port.connection.source_port.name,
+                        'dest_module_name': port.connection.dest_module_name,
+                        'dest_port_name': port.connection.dest_port.name
+                    }
                 module_info['ports'].append(port_info)
             
             modules_dict.append(module_info)
@@ -1174,6 +1188,16 @@ class VerilogModuleCollection:
                 # 如果连接创建失败，打印错误信息但继续处理其他连接
                 print(f"警告: 无法创建连接 {conn_info['source_module_name']}.{conn_info['source_port_name']} -> {conn_info['dest_module_name']}.{conn_info['dest_port_name']}: {e}")
         
+        # 为端口设置connection属性
+        # 遍历所有连接，将连接对象赋值给对应的端口
+        for conn in collection.connections:
+            # 为源端口设置connection属性
+            if hasattr(conn.source_port, 'connection'):
+                conn.source_port.connection = conn
+            # 为目标端口设置connection属性
+            if hasattr(conn.dest_port, 'connection'):
+                conn.dest_port.connection = conn
+                
         return collection
     
     @classmethod
@@ -1251,3 +1275,8 @@ class VerilogModuleCollection:
         except Exception as e:
             print(f"错误: 无法从文件 {file_path} 加载模块集合: {e}")
             return None
+
+class VerilogMergeConnection(VerilogConnection):
+    def __init__(self, source_port, dest_port, source_bit_range, dest_bit_range):
+        super().__init__(source_port, dest_port, source_bit_range, dest_bit_range)
+        self.type = 'joint' # can extend OR XOR AND OR ...
