@@ -15,7 +15,7 @@ import re
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
-    version = "1.2.0" 
+    version = "2.0.0" 
     
     def __init__(self, root):
         """初始化GUI界面"""
@@ -153,7 +153,7 @@ class WGenGUI:
         left_paned.pack(fill=tk.BOTH, expand=True)
         
         # 左侧上部分（互联hierarchy）
-        hierarchy_frame = ttk.LabelFrame(left_paned, text="互联Hierarchy")
+        hierarchy_frame = ttk.LabelFrame(left_paned, text="Hierarchy")
         left_paned.add(hierarchy_frame, weight=1)
         
         # 使用Text控件，以多行文本加缩进的方式展示层次关系
@@ -166,7 +166,7 @@ class WGenGUI:
         # self.hierarchy_text.configure(yscrollcommand=hierarchy_scrollbar.set)
         
         # 左侧下部分（模块列表）
-        modules_frame = ttk.LabelFrame(left_paned, text="模块列表")
+        modules_frame = ttk.LabelFrame(left_paned, text="Module List")
         left_paned.add(modules_frame, weight=1)
         
         self.modules_tree = ttk.Treeview(modules_frame)
@@ -206,7 +206,7 @@ class WGenGUI:
         right_main_paned.add(master_paned, weight=1)
         
         # Master上方 - 输出端口列表
-        master_ports_frame = ttk.LabelFrame(master_paned, text="Master输出端口")
+        master_ports_frame = ttk.LabelFrame(master_paned, text="Master Ports")
         master_paned.add(master_ports_frame, weight=1)
         
         # 创建内部容器框架
@@ -234,7 +234,7 @@ class WGenGUI:
         self.master_ports_tree.bind("<Double-1>", lambda event: self._on_port_double_click(self.master_ports_tree, event))
         
         # Master下方 - 电路示意图
-        master_schematic_frame = ttk.LabelFrame(master_paned, text="Master电路示意图")
+        master_schematic_frame = ttk.LabelFrame(master_paned, text="Master Schematic")
         master_paned.add(master_schematic_frame, weight=1)
         
         self.master_canvas = tk.Canvas(master_schematic_frame, bg="white")
@@ -255,7 +255,7 @@ class WGenGUI:
         right_main_paned.add(slave_paned, weight=1)
         
         # Slave上方 - 输入端口列表
-        slave_ports_frame = ttk.LabelFrame(slave_paned, text="Slave输入端口")
+        slave_ports_frame = ttk.LabelFrame(slave_paned, text="Slave Ports")
         slave_paned.add(slave_ports_frame, weight=1)
         
         # 创建内部容器框架
@@ -282,17 +282,23 @@ class WGenGUI:
         # # # 绑定双击事件，用于显示端口信息
         self.slave_ports_tree.bind("<Double-1>", lambda event: self._on_port_double_click(self.slave_ports_tree, event))
         
-        # 创建端口右键菜单
-        self.port_menu = tk.Menu(self.root, tearoff=0)
-        self.port_menu.add_command(label="断开连接", command=lambda: self._port_menu_action("optionA", self.current_tree))
-        self.port_menu.add_separator()
-        self.port_menu.add_command(label="tie 0", command=lambda: self._port_menu_action("optionB", self.current_tree))
-        self.port_menu.add_command(label="tie 1", command=lambda: self._port_menu_action("optionC", self.current_tree))
-        self.port_menu.add_separator()
-        self.port_menu.add_command(label="cancel", command=lambda: self._port_menu_action("optionD", self.current_tree))
+        # 创建master端口右键菜单
+        self.master_port_menu = tk.Menu(self.root, tearoff=0)
+        self.master_port_menu.add_command(label="断开连接", command=lambda: self._port_menu_action("optionA", self.current_tree))
+        self.master_port_menu.add_separator()
+        self.master_port_menu.add_command(label="cancel", command=lambda: self._port_menu_action("optionD", self.current_tree))        
+
+        # 创建slave端口右键菜单
+        self.slave_port_menu = tk.Menu(self.root, tearoff=0)
+        self.slave_port_menu.add_command(label="断开连接", command=lambda: self._port_menu_action("optionA", self.current_tree))
+        self.slave_port_menu.add_separator()
+        self.slave_port_menu.add_command(label="tie 0", command=lambda: self._port_menu_action("optionB", self.current_tree))
+        self.slave_port_menu.add_command(label="tie 1", command=lambda: self._port_menu_action("optionC", self.current_tree))
+        self.slave_port_menu.add_separator()
+        self.slave_port_menu.add_command(label="cancel", command=lambda: self._port_menu_action("optionD", self.current_tree))
         
         # Slave下方 - 电路示意图
-        slave_schematic_frame = ttk.LabelFrame(slave_paned, text="Slave电路示意图")
+        slave_schematic_frame = ttk.LabelFrame(slave_paned, text="Slave Schematic")
         slave_paned.add(slave_schematic_frame, weight=1)
         
         self.slave_canvas = tk.Canvas(slave_schematic_frame, bg="white")
@@ -901,8 +907,11 @@ class WGenGUI:
             widget.focus(item)
             # 记录当前操作的tree控件
             self.current_tree = widget
-            # 显示右键菜单
-            self.port_menu.post(event.x_root, event.y_root)
+            # 根据控件类型显示对应的右键菜单
+            if widget == self.master_ports_tree:
+                self.master_port_menu.post(event.x_root, event.y_root)
+            elif widget == self.slave_ports_tree:
+                self.slave_port_menu.post(event.x_root, event.y_root)
     
     def _port_menu_action(self, action, tree=None):
         """端口右键菜单操作"""
