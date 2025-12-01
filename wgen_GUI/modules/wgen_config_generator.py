@@ -265,7 +265,7 @@ class WgenConfigGenerator(CodeGeneratorInterface):
         for connection in db.connections:
             src_port_range_str = ""
             dst_port_range_str = ""
-            if connection._get_width_value(connection.source_bit_range) > 1 and connection._get_width_value(connection.dest_bit_range) > 1:
+            if connection._get_width_value(connection.source_port.width) > 1 or connection._get_width_value(connection.dest_port.width) > 1:
                 src_port_range_str = f"({connection.source_bit_range['high']}:{connection.source_bit_range['low']})" 
                 dst_port_range_str = f"({connection.dest_bit_range['high']}:{connection.dest_bit_range['low']})" 
 
