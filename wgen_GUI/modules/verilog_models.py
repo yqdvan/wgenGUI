@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Any, Optional, List
 
 class VerilogPort:
     """Verilog端口类，用于描述Verilog模块的端口信息"""
@@ -312,22 +312,25 @@ class VerilogConnection:
         self.source_port = source_port
         self.dest_port = dest_port
         
-        # 设置源端口的位范围，如果未提供则使用整个端口位宽
-        if source_bit_range is None:
-            self.source_bit_range = source_port.width.copy()
-        else:
-            # 验证位范围是否有效
-            self._validate_bit_range(source_bit_range, source_port.width)
-            self.source_bit_range = source_bit_range
+        # # 设置源端口的位范围，如果未提供则使用整个端口位宽
+        # if source_bit_range is None:
+        #     self.source_bit_range = source_port.width.copy()
+        # else:
+        #     # 验证位范围是否有效
+        #     self._validate_bit_range(source_bit_range, source_port.width)
+        #     self.source_bit_range = source_bit_range
         
-        # 设置目标端口的位范围，如果未提供则使用整个端口位宽
-        if dest_bit_range is None:
-            self.dest_bit_range = dest_port.width.copy()
-        else:
-            # 验证位范围是否有效
-            self._validate_bit_range(dest_bit_range, dest_port.width)
-            self.dest_bit_range = dest_bit_range
-            
+        # # 设置目标端口的位范围，如果未提供则使用整个端口位宽
+        # if dest_bit_range is None:
+        #     self.dest_bit_range = dest_port.width.copy()
+        # else:
+        #     # 验证位范围是否有效
+        #     self._validate_bit_range(dest_bit_range, dest_port.width)
+        #     self.dest_bit_range = dest_bit_range
+        self.source_bit_range = source_bit_range
+        self.dest_bit_range = dest_bit_range
+        self._check_range()
+
         # 记录端口所属模块名称，方便显示
         if hasattr(source_module, 'name'):
             self.source_module_name = source_module.name
@@ -338,7 +341,28 @@ class VerilogConnection:
             self.dest_module_name = dest_module.name
         else:
             self.dest_module_name = 'unknown_module'
-    
+
+    def _check_range(self):
+        """
+        验证连接的位范围是否有效
+        
+        异常:
+            ValueError: 如果位范围无效
+        """
+        # 设置源端口的位范围，如果未提供则使用整个端口位宽
+        if self.source_bit_range is None:
+            self.source_bit_range = self.source_port.width.copy()
+        else:
+            # 验证位范围是否有效
+            self._validate_bit_range(self.source_bit_range, self.source_port.width)
+        
+        # 设置目标端口的位范围，如果未提供则使用整个端口位宽
+        if self.dest_bit_range is None:
+            self.dest_bit_range = self.dest_port.width.copy()
+        else:
+            # 验证位范围是否有效
+            self._validate_bit_range(self.dest_bit_range, self.dest_port.width)
+          
     def _get_width_value(self, bit_range):
         """
         计算位范围的宽度值（高索引 - 低索引 + 1）
@@ -356,8 +380,8 @@ class VerilogConnection:
         验证位范围是否在端口位宽范围内
         
         参数:
-            bit_range (dict): 要验证的位范围
-            port_width (dict): 端口的位宽范围
+            bit_range (dict): 要验证的位范围(碎片)
+            port_width (dict): 端口的位宽范围(完整)
             
         异常:
             ValueError: 如果位范围无效
@@ -399,6 +423,45 @@ class VerilogConnection:
             dest_str += dest_range_str
         
         return f"{source_str} -> {dest_str}"
+
+class VerilogMergeConnection(VerilogConnection):
+    def __init__(self, source_port, dest_port, source_bit_range, dest_bit_range, 
+        merge_type: str = 'joint',source_port_list: list[VerilogPort] = [],source_range_list: list[dict] = []):
+
+        if(source_port_list == []):
+            raise ValueError("source_port_list cannot empty!")
+        self.type = merge_type # can extend OR XOR AND OR ...
+        self.source_port_list = source_port_list
+        self.source_range_list = source_range_list
+        self.gui_data_list = []
+
+        # 用list中的第一个端口作为源端口    
+        super().__init__(source_port_list[0], dest_port, source_range_list[0], dest_bit_range)
+
+
+    # 重写_check_range方法，验证每个源端口的位范围是否有效
+    def _check_range(self) -> bool:
+        """
+        验证每个源端口的位范围是否有效
+        
+        返回:
+            bool: 如果所有位范围有效则返回True，否则返回False
+        """
+        for i in range(len(self.source_port_list)):
+            if self.source_range_list[i] is None:
+                self.source_range_list[i] = self.source_port_list[i].width.copy()
+            else:
+                self._validate_bit_range(self.source_range_list[i], self.source_port_list[i].width)
+
+        # 设置目标端口的位范围，如果未提供则使用整个端口位宽
+        if self.dest_bit_range is None:
+            self.dest_bit_range = self.dest_port.width.copy()
+        else:
+            # 验证位范围是否有效
+            self._validate_bit_range(self.dest_bit_range, self.dest_port.width)   
+
+        return True
+
 
 class VerilogModuleCollection:
     """Verilog模块集合类，用于管理多个Verilog模块"""
@@ -673,13 +736,18 @@ class VerilogModuleCollection:
     def delete_port_connection(self, module: VerilogModule, port: VerilogPort) -> str:
         ans_str = ""
         # 删除这个端口的所有连接信息
-        module.source = None
-        port.destinations: list[VerilogPort] = []
+        # module.source = None
+        # port.destinations: list[VerilogPort] = []
 
-        # 删除collections中所有包含这个端口的连接,并返回删除的连接
-        deleted_conns = [conn for conn in self.connections if conn.source_port == port or conn.dest_port == port]
-        ans_str += f"VerilogModule {module.name} port {port.name} delete {len(deleted_conns)} connections;\n"
-        self.connections = [conn for conn in self.connections if conn.source_port != port and conn.dest_port != port]
+        # # 删除collections中所有包含这个端口的连接,并返回删除的连接
+        # deleted_conns = [conn for conn in self.connections if conn.source_port == port or conn.dest_port == port]
+        # ans_str += f"VerilogModule {module.name} port {port.name} delete {len(deleted_conns)} connections;\n"
+        # self.connections = [conn for conn in self.connections if conn.source_port != port and conn.dest_port != port]
+        loads_num = len(port.destinations)
+        if self.remove_master_port_connections(port) == "":
+            ans_str += f"VerilogModule {module.name} port {port.name} delete {loads_num} destinations;\n"
+        if self.remove_slave_port_connection(port) == "":
+            ans_str += f"VerilogModule {module.name} port {port.name} delete 1 source;\n"
         return ans_str
 
     def get_module(self, module_name: str, md_list: Optional[List['VerilogModule']] = None) -> Optional['VerilogModule']:
@@ -787,7 +855,7 @@ class VerilogModuleCollection:
         # if dest_port.is_input() or dest_port.is_inout():
         dest_port.source = source_port
     
-    def remove_master_port_connections(self, master_port: VerilogPort):
+    def remove_master_port_connections(self, master_port: VerilogPort) -> str:
         """
         删除主端口的连接
         
@@ -806,7 +874,9 @@ class VerilogModuleCollection:
             return message_str
         
         # 从每个目标端口的destinations列表中移除主端口
-        for dest_port in master_port.destinations:
+        # for dest_port in master_port.destinations:
+        while master_port.destinations:
+            dest_port = master_port.destinations[0]
             if master_port is dest_port.source:
                 self.remove_slave_port_connection(dest_port)
                 ans = True
@@ -1276,7 +1346,4 @@ class VerilogModuleCollection:
             print(f"错误: 无法从文件 {file_path} 加载模块集合: {e}")
             return None
 
-class VerilogMergeConnection(VerilogConnection):
-    def __init__(self, source_port, dest_port, source_bit_range, dest_bit_range):
-        super().__init__(source_port, dest_port, source_bit_range, dest_bit_range)
-        self.type = 'joint' # can extend OR XOR AND OR ...
+

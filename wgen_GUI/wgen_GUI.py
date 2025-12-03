@@ -6,7 +6,7 @@ from tkinter import ttk, messagebox, simpledialog, filedialog, scrolledtext
 import copy
 from collections import deque
 from modules.verilog_parser import VerilogParser
-from modules.verilog_models import VerilogModuleCollection, VerilogPort
+from modules.verilog_models import VerilogMergeConnection, VerilogModuleCollection, VerilogPort
 from modules.file_handler import FileHandler
 from modules.toast import Toast
 from modules.wgen_config_generator import WgenConfigGenerator
@@ -294,6 +294,7 @@ class WGenGUI:
         self.slave_port_menu.add_separator()
         self.slave_port_menu.add_command(label="tie 0", command=lambda: self._port_menu_action("optionB", self.current_tree))
         self.slave_port_menu.add_command(label="tie 1", command=lambda: self._port_menu_action("optionC", self.current_tree))
+        self.slave_port_menu.add_command(label="split in", command=lambda: self._port_menu_action("optionE", self.current_tree))
         self.slave_port_menu.add_separator()
         self.slave_port_menu.add_command(label="cancel", command=lambda: self._port_menu_action("optionD", self.current_tree))
         
@@ -861,7 +862,7 @@ class WGenGUI:
                         else:
                             connect_show = port.destinations[0].father_module.name + "." + port.destinations[0].name
                     # 根据端口方向设置背景色：input淡蓝，output默认
-                    bg_color = 'lightblue' if port.direction == 'input' else ''
+                    bg_color = '#e0f0f5' if port.direction == 'input' else '' #'lightblue'
                     self.master_ports_tree.insert('', tk.END, values=(port.name, width_show, connect_show), open=True, tags=(port.direction,))
                     self.master_ports_tree.tag_configure(port.direction, background=bg_color)
                 else:
@@ -894,7 +895,7 @@ class WGenGUI:
                     if port.source:
                         connect_show = port.source.father_module.name + "." + port.source.name
                     # 根据端口方向设置背景色：input默认，output淡蓝
-                    bg_color = '' if port.direction == 'input' else 'lightblue'
+                    bg_color = '' if port.direction == 'input' else '#e0f0f5' #'lightblue'
                     self.slave_ports_tree.insert('', tk.END, values=(port.name,width_show, connect_show), open=True, tags=(port.direction,))
                     self.slave_ports_tree.tag_configure(port.direction, background=bg_color)
                 else:
@@ -975,9 +976,9 @@ class WGenGUI:
             self._update_master_display()
             self._update_slave_display()
 
-        elif tree_type == "master" and (action == "optionB" or action == "optionC"):
-            messagebox.showinfo("操作提示", f"Master output cannot be tied to {action}")
-        
+        # elif tree_type == "master" and (action == "optionB" or action == "optionC"):
+        #     messagebox.showinfo("操作提示", f"Master output cannot be tied to {action}")
+
         elif tree_type == "slave" and action == "optionA":  
             port_obj = self.slave_module.get_port(port_name)
             if port_obj:
@@ -1034,10 +1035,327 @@ class WGenGUI:
                 messagebox.showerror("错误", f"端口 {port_name} 不是 VerilogPort 类型")
             self._update_master_display()
             self._update_slave_display()
-
+        
+        elif tree_type == "slave" and action == "optionE": # split in
+            print(f"split in {port_name}")
+            self._create_spilt_in_connection(port_name)
         else:
             show_str = f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}"
             Toast(self.root, show_str, duration=2000, position='center')
+
+    def _create_spilt_in_connection(self, port_name):
+        port_obj = self.slave_module.get_port(port_name)
+        if isinstance(port_obj, VerilogPort):
+            module_list = []
+            for ins in self.modules:
+                module_list.append(ins)
+
+            module_list.append(self.collection_DB.system_module)
+            
+            if isinstance(port_obj.connection, VerilogMergeConnection):
+                port_data_list = self._multiple_port_selector(module_list, [0, 1, 2, 3])
+            else:
+                port_data_list = self._multiple_port_selector(module_list)
+
+            if port_data_list:
+                print(port_data_list)
+            else:
+                messagebox.showerror("错误", "请输入正确的端口数据")
+        
+        else:
+            messagebox.showerror("错误", f"端口 {port_name} 不是 VerilogPort 类型")
+
+    def _multiple_port_selector(self, module_list:list, data_list:list =[]) -> list:
+        # 定义要返回的数据
+        collected_data = []
+        
+        # 创建Split In Connection窗口
+        split_window = tk.Toplevel(self.root)
+        split_window.title("Multy Port Seletor")
+        split_window.transient(self.root)
+        split_window.grab_set()
+        
+        # 设置窗口大小和位置
+        window_width = 700
+        window_height = 400
+        screen_width = split_window.winfo_screenwidth()
+        screen_height = split_window.winfo_screenheight()
+        x = (screen_width // 2) - (window_width // 2)
+        y = (screen_height // 2) - (window_height // 2)
+        split_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        
+        # 创建主框架
+        main_frame = ttk.Frame(split_window, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 创建列表视图（Treeview）- 删除了option列
+        columns = ("insName", "portName", "bitRange")
+        tree = ttk.Treeview(main_frame, columns=columns, show="headings", selectmode="browse")
+        
+        # 设置列标题和宽度（4:4:1比例）
+        tree.heading("insName", text="InstanceName")
+        tree.column("insName", width=220)  
+        
+        tree.heading("portName", text="PortName")
+        tree.column("portName", width=240) 
+        
+        tree.heading("bitRange", text="BitRange")
+        tree.column("bitRange", width=60)   
+        
+        # 创建滚动条
+        scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        
+        # 布局Treeview和滚动条
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, pady=(0, 10))
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=(0, 10))
+        
+        # 定义创建编辑器的函数
+        def create_editor(event):
+            # 获取双击的行和列
+            item = tree.identify_row(event.y)
+            column = tree.identify_column(event.x)
+            
+            # 确保获取到有效的行和列
+            if not item or not column:
+                return
+            
+            # 获取列索引和列名
+            try:
+                col_index = int(column.split("#")[1]) - 1
+                if col_index < 0 or col_index >= len(columns):
+                    return
+                col_name = columns[col_index]
+            except (ValueError, IndexError):
+                return
+            
+            # 获取单元格位置
+            bbox = tree.bbox(item, column)
+            if not bbox:
+                return
+            x, y, width, height = bbox
+            
+            # 移除现有编辑器
+            for widget in tree.winfo_children():
+                if widget.winfo_name().startswith("!entry") or widget.winfo_name().startswith("!combobox"):
+                    widget.destroy()
+            
+            # 为insName列创建下拉菜单编辑器
+            if col_name == "insName":
+                # 获取所有模块名称
+                ins_names = [md.name for md in self.modules]
+                
+                # 确保ins_names列表不为空
+                if not ins_names:
+                    ins_names = ["", "No modules available"]
+                
+                # 创建Combobox编辑器
+                combobox = ttk.Combobox(tree, values=ins_names, width=25)
+                combobox.place(x=x, y=y, width=width, height=height)
+                
+                # 设置当前值
+                current_value = tree.set(item, col_name)
+                if current_value:
+                    combobox.set(current_value)
+                else:
+                    # 默认显示列表的第一个选项
+                    if ins_names:
+                        combobox.set(ins_names[0])
+                
+                # 设置combobox为只读模式并确保小三角显示
+                combobox.configure(state="readonly")
+                
+                # 绑定事件处理函数
+                def on_combobox_select(event, item=item, col_name=col_name):
+                    selected_value = combobox.get()
+                    if selected_value and selected_value != "No modules available":
+                        tree.set(item, col_name, selected_value)
+                        # 从对应模块获取第一个端口的名称并设置为默认值
+                        default_port_name = ""
+                        for module in self.modules:
+                            if module.name == selected_value:
+                                if module.ports:
+                                    default_port_name = module.ports[0].name
+                                break
+                        tree.set(item, "portName", default_port_name)
+                    combobox.destroy()
+                
+                # 绑定事件
+                combobox.bind("<<ComboboxSelected>>", on_combobox_select)
+                combobox.bind("<FocusOut>", on_combobox_select)
+                combobox.bind("<Return>", on_combobox_select)
+                
+                # 设置焦点
+                combobox.focus_set()
+            
+            # 为portName列创建下拉菜单编辑器
+            elif col_name == "portName":
+                # 获取当前行的insName值
+                current_ins_name = tree.set(item, "insName")
+                ports_names = []
+                
+                # 如果insName有值，则从对应模块获取端口列表
+                if current_ins_name:
+                    # 从self.modules中查找对应的模块
+                    for module in module_list:
+                        if module.name == current_ins_name:
+                            ports_names = [port.name for port in module.ports]
+                            break
+                
+                # 如果没有找到对应模块或模块没有端口，则使用默认值
+                if not ports_names:
+                    ports_names = ["", "No ports available"]
+                
+                # 创建Combobox编辑器
+                combobox = ttk.Combobox(tree, values=ports_names, width=25)
+                combobox.place(x=x, y=y, width=width, height=height)
+                
+                # 设置当前值
+                current_value = tree.set(item, col_name)
+                if current_value:
+                    combobox.set(current_value)
+                else:
+                    # 默认显示列表的第一个选项
+                    if ports_names:
+                        combobox.set(ports_names[0])
+                
+                # 设置combobox为只读模式并确保小三角显示
+                # combobox.configure(state="readonly")
+                
+                # 绑定事件处理函数
+                def on_combobox_select(event, item=item, col_name=col_name):
+                    selected_value = combobox.get()
+                    if selected_value and selected_value != "No ports available":
+                        tree.set(item, col_name, selected_value)
+                    combobox.destroy()
+                
+                # 绑定事件
+                combobox.bind("<<ComboboxSelected>>", on_combobox_select)
+                combobox.bind("<FocusOut>", on_combobox_select)
+                combobox.bind("<Return>", on_combobox_select)
+                
+                # 设置焦点
+                combobox.focus_set()
+            
+            # 为bitRange列创建文本输入编辑器
+            elif col_name == "bitRange":
+                # 创建Entry编辑器
+                entry = ttk.Entry(tree, width=15)
+                entry.place(x=x, y=y, width=width, height=height)
+                
+                # 设置当前值
+                current_value = tree.set(item, col_name)
+                if current_value:
+                    entry.insert(0, current_value)
+                else:
+                    entry.insert(0, "0:0")
+                
+                # 绑定事件处理函数
+                def on_entry_confirm(event, item=item, col_name=col_name):
+                    entry_value = entry.get()
+                    tree.set(item, col_name, entry_value)
+                    entry.destroy()
+                
+                # 绑定回车键事件
+                entry.bind("<Return>", on_entry_confirm)
+                # 绑定焦点离开事件
+                entry.bind("<FocusOut>", on_entry_confirm)
+                
+                # 设置焦点并全选文本
+                entry.focus_set()
+                entry.select_range(0, tk.END)
+        
+        # 绑定Treeview点击事件
+        tree.bind("<Double-1>", create_editor)
+        
+        # 添加行的函数
+        def add_row():
+            # 获取默认的模块名称
+            default_ins_name = ""
+            ins_names = [md.name for md in self.modules]
+            if ins_names:
+                default_ins_name = ins_names[0]
+            
+            # 获取默认的端口名称（空，因为需要先选择模块）
+            default_port_name = ""
+            
+            # 创建一个新行，包含默认值
+            tree.insert("", tk.END, values=(default_ins_name, default_port_name, "0:0"))
+        
+        # 删除行的函数
+        def delete_row():
+            selected_item = tree.selection()
+            if selected_item:
+                tree.delete(selected_item)
+        
+        # 创建添加/删除行按钮 - 上下排列
+        button_frame = ttk.Frame(main_frame, width=100)
+        button_frame.pack(side=tk.RIGHT, padx=(20, 10), pady=10, fill=tk.NONE)
+        
+        add_button = ttk.Button(button_frame, text="Add Row", command=add_row)
+        add_button.pack(fill=tk.X, pady=(5, 5), padx=5)
+        
+        delete_button = ttk.Button(button_frame, text="Delete Row", command=delete_row)
+        delete_button.pack(fill=tk.X, pady=(0, 5), padx=5)
+        
+        # 获取所有数据的函数
+        def get_all_data():
+            data = []
+            for item in tree.get_children():
+                row = tree.item(item)['values']
+                if any(row):  # 只返回非空行
+                    data.append({
+                        "insName": row[0],
+                        "portName": row[1],
+                        "bitRange": row[2]
+                    })
+            return data
+        
+
+        
+        # Connect按钮功能
+        def connect_data():
+            nonlocal collected_data
+            data = get_all_data()
+            if data:
+                print("Connect - Split In Connection Data:")
+                for i, row in enumerate(data, 1):
+                    print(f"Row {i}: {row}")
+                messagebox.showinfo("Connect", "连接操作已执行，数据已打印到控制台")
+                collected_data = data  # 保存收集到的数据
+                split_window.destroy()
+            else:
+                messagebox.showwarning("警告", "没有数据可连接")
+        
+        # Cancel按钮功能
+        def cancel():
+            nonlocal collected_data
+            collected_data = []  # 取消时返回空列表
+            split_window.destroy()
+        
+        # 创建底部按钮框架 - 居中显示
+        bottom_frame = ttk.Frame(split_window)
+        bottom_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        # 添加三个按钮 - 居中排列
+        buttons_container = ttk.Frame(bottom_frame)
+        buttons_container.pack(anchor=tk.CENTER)
+        
+        connect_button = ttk.Button(buttons_container, text="Connect", command=connect_data)
+        connect_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        cancel_button = ttk.Button(buttons_container, text="Cancel", command=cancel)
+        cancel_button.pack(side=tk.LEFT)
+        
+        # 确保窗口阻塞主程序流程（模态窗口）
+        split_window.transient(self.root)
+        split_window.grab_set()
+        
+        # 等待窗口关闭后再继续执行
+        self.root.wait_window(split_window)
+        
+        # 返回收集到的数据
+        return collected_data
 
     def _draw_module_schematic(self, canvas, module):
         """绘制模块电路示意图"""
@@ -1056,7 +1374,7 @@ class WGenGUI:
         if module.need_gen:
             #设置颜色为lightblue
             fill_color = "#99CCFF"
-            fill_color = "#add8e6"
+            fill_color = "#add8e6" # 'lightblue'
 
         # 获取画布尺寸
         width = canvas.winfo_width()
@@ -1234,7 +1552,8 @@ class WGenGUI:
         
         hierarchy_text = "# 模块层次结构\n"
         hierarchy_text += "# ===============\n\n"
-        
+        hierarchy_text = ''
+
         if not top_modules:
             # 如果没有top模块，显示提示信息
             hierarchy_text += "未找到顶级模块\n"
@@ -1286,7 +1605,7 @@ class WGenGUI:
         
         # 添加是否为生成模块的标记
         if hasattr(module, 'need_gen') and module.need_gen:
-            module_text += " [需要生成]"
+            module_text += " [needGen]"
         
         # 检查模块是否有包含的模块
         includes = getattr(module, 'includes', [])
@@ -1396,6 +1715,7 @@ class WGenGUI:
         - 端口连接状态管理
         - 所有连接信息查询
         - 支持模块信息批量更新
+        - 支持端口拆分连接管理
 
     感谢使用本软件！
         """
