@@ -88,9 +88,9 @@ class VerilogPort:
         """判断是否为双向端口"""
         return self.direction == 'inout'
     
-    def get_bit_width(self):
-        """获取端口的位宽"""
-        return self.width['high'] - self.width['low'] + 1
+    # def get_bit_width(self):
+    #     """获取端口的位宽"""
+    #     return self.width['high'] - self.width['low'] + 1
 
     def get_port_full_name(self):
         """获取端口的全名，包括模块名称"""
@@ -282,7 +282,14 @@ class VerilogModule:
 class VerilogConnection:
     """Verilog连接类，用于描述两个模块之间的连接"""
     
-    def __init__(self, source_module:VerilogModule, source_port:VerilogPort, dest_module:VerilogModule, dest_port:VerilogPort, source_bit_range=None, dest_bit_range=None):
+    def __init__(self,
+            source_module:VerilogModule, 
+            source_port:VerilogPort, 
+            dest_module:VerilogModule, 
+            dest_port:VerilogPort, 
+            source_bit_range=None, 
+            dest_bit_range=None
+        ):
         """
         初始化Verilog连接
         
@@ -425,8 +432,17 @@ class VerilogConnection:
         return f"{source_str} -> {dest_str}"
 
 class VerilogMergeConnection(VerilogConnection):
-    def __init__(self, source_port, dest_port, source_bit_range, dest_bit_range, 
-        merge_type: str = 'joint',source_port_list: list[VerilogPort] = [],source_range_list: list[dict] = []):
+    def __init__(self, 
+            source_module:VerilogModule, 
+            source_port:VerilogPort, 
+            dest_module:VerilogModule, 
+            dest_port:VerilogPort, 
+            source_bit_range=None, 
+            dest_bit_range=None,
+            merge_type: str = 'joint',
+            source_port_list: list[VerilogPort] = [],
+            source_range_list: list[dict] = []
+        ):
 
         if(source_port_list == []):
             raise ValueError("source_port_list cannot empty!")
@@ -436,8 +452,14 @@ class VerilogMergeConnection(VerilogConnection):
         self.gui_data_list = []
 
         # 用list中的第一个端口作为源端口    
-        super().__init__(source_port_list[0], dest_port, source_range_list[0], dest_bit_range)
-
+        super().__init__(
+            source_module=source_module,
+            source_port=source_port,
+            dest_module=dest_module,
+            dest_port=dest_port,
+            source_bit_range=source_bit_range,
+            dest_bit_range=dest_bit_range
+        )
 
     # 重写_check_range方法，验证每个源端口的位范围是否有效
     def _check_range(self) -> bool:
@@ -462,6 +484,17 @@ class VerilogMergeConnection(VerilogConnection):
 
         return True
 
+    # 重写__str__方法，显示合并连接的信息
+    def __str__(self):
+        """返回合并连接的字符串表示"""
+        #遍历 self.source_port_list 和 self.source_range_list 构建 port.father_module.name . port.name [range['high':range['low']]]
+        source_str = ""
+        for i in range(len(self.source_port_list)):
+            source_str += f"{self.source_port_list[i].father_module.name}.{self.source_port_list[i].name} [{self.source_range_list[i]['high']}:{self.source_range_list[i]['low']}]"
+            if i < len(self.source_port_list) - 1:
+                source_str += ", "
+
+        return f"{{{source_str}}}-> {self.dest_module_name}.{self.dest_port.name} [{self.dest_bit_range['high']}:{self.dest_bit_range['low']}]"
 
 class VerilogModuleCollection:
     """Verilog模块集合类，用于管理多个Verilog模块"""
@@ -767,7 +800,56 @@ class VerilogModuleCollection:
             if module.name == module_name:
                 return module
         return None
-    
+      
+    def add_mergeConnection(self, from_port_list: list[VerilogPort], from_range_list: list[dict],new_gui_data_list: list[list[dict]], to_port: VerilogPort):
+        """
+        连接多个端口到一个端口
+        
+        参数:
+            from_port_list (list[VerilogPort]): 源端口列表
+            to_port (VerilogPort): 目标端口
+        """
+
+        # 0.1 检查源端口列表是否为空
+        if not from_port_list:
+            raise ValueError("source port list cannot be empty")
+
+        # 0.2 检查new_gui_data_list是否为空
+        if not new_gui_data_list:
+            raise ValueError("new_gui_data_list cannot be empty")
+
+        # 0.3 to_port source 应该是空的
+        if to_port.source:
+            raise ValueError("target port cannot have source connection")
+
+        # 0.4 检查new_gui_data_list的长度是否与from_port_list相同
+        if len(new_gui_data_list) != len(from_port_list):
+            raise ValueError("new_gui_data_list length must be same as source port list")
+
+        # 1. 创建mergeConnection
+        merge_conn = VerilogMergeConnection(
+            source_module=from_port_list[0].father_module,
+            source_port=from_port_list[0], 
+            dest_module=to_port.father_module,
+            dest_port=to_port,
+            source_bit_range=from_range_list[0], 
+            dest_bit_range=to_port.width, 
+            merge_type='joint',
+            source_port_list=from_port_list, 
+            source_range_list=from_range_list
+        )
+        self.connections.append(merge_conn)
+
+        # 2. All data can be trusted. 修改数据结构
+        # 2.1 增加改变目标的来源
+        to_port.source = from_port_list[0] # 兼容connection 具体信息存在MergeConnection内
+        for from_port in from_port_list:
+            # 2.2 增加改变源的目的地
+            if to_port not in from_port.destinations:
+                from_port.destinations.append(to_port)
+        # 2.2 增加改变目标的连接
+        to_port.connection = merge_conn
+            
     def connect_port(self, from_port:VerilogPort, to_port: VerilogPort, 
                      source_bit_range=None, dest_bit_range=None):
         """

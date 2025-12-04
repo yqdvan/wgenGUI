@@ -544,7 +544,30 @@ class WGenGUI:
             # 打印完整的异常堆栈跟踪信息
             traceback.print_exc()
             messagebox.showerror("错误", f"更新时发生错误,请手动回退数据库！\n {str(e)}")
+
+    def _parse_str_width(self, new_width: str) -> tuple[int, int]:
+        """
+        解析用户输入的宽度信息
         
+        参数:
+            new_width: 用户输入的宽度字符串，格式可以是单个数字或 [high:low] 格式
+        
+        返回:
+            tuple: 包含 high 和 low 值的元组
+        
+        异常:
+            ValueError: 当输入格式不正确时抛出
+        """
+        try:
+            new_width = str(new_width).strip()
+            if re.match(r'[0-9]+$', new_width):
+                high = low = int(new_width)
+            else:
+                high, low = map(int, new_width.strip('[]').split(':'))
+            return high, low
+        except Exception as e:
+            messagebox.showerror("错误", "输入的端口宽度格式不正确，请使用 [high:low] 格式！"+str(e))
+
     def _create_connection(self):
         """创建连接按钮的响应函数，显示选中的master和slave端口"""
         # 获取master端口列表中选中的端口
@@ -581,27 +604,27 @@ class WGenGUI:
                         f"端口 {from_port_obj.name} 宽度为 {from_bit_range}，端口 {to_port_obj.name} 宽度为 {to_bit_range}。\n请输入源端口范围（格式如 [high:low] ）："
                     )
                     if new_width:
-                        try:
-                            # 解析用户输入的宽度
-                            # 如果输入是\d+ (即一个或多个数字),则high 和 low都等于这个值
-                            print(f"new_width: {new_width}")
-                            if re.match(r'[0-9]+', new_width):
-                                high = low = int(new_width)
-                            else:
-                                high, low = map(int, new_width.strip('[]').split(':'))
+                        # try:
+                        # 解析用户输入的宽度
+                        # 如果输入是\d+ (即一个或多个数字),则high 和 low都等于这个值
+                        print(f"new_width: {new_width}")
+                        # if re.match(r'[0-9]+', new_width):
+                        #     high = low = int(new_width)
+                        # else:
+                        #     high, low = map(int, new_width.strip('[]').split(':'))
+                        high, low = self._parse_str_width(new_width)
 
-                            if(from_bit_range['high'] < high or from_bit_range['low'] > low):
-                                messagebox.showerror("错误", f"端口 {from_port_obj.name} 宽度为 {from_bit_range}，输入的端口范围 [{high}:{low}] 超出了端口范围！")
-                                return
-                            
-                            from_bit_range = {'high': high, 'low': low}
-                            if (from_bit_range['high'] - from_bit_range['low']) != (to_bit_range['high'] - to_bit_range['low']):
-                                messagebox.showerror("错误", f"端口位宽仍然不匹配，请重新操作！{from_bit_range},{to_bit_range}")
-                                return
-
-                        except Exception as e:
-                            messagebox.showerror("错误", "输入的端口宽度格式不正确，请使用 [high:low] 格式！"+str(e))
+                        if(from_bit_range['high'] < high or from_bit_range['low'] > low):
+                            messagebox.showerror("错误", f"端口 {from_port_obj.name} 宽度为 {from_bit_range}，输入的端口范围 [{high}:{low}] 超出了端口范围！")
                             return
+                        
+                        from_bit_range = {'high': high, 'low': low}
+                        if (from_bit_range['high'] - from_bit_range['low']) != (to_bit_range['high'] - to_bit_range['low']):
+                            messagebox.showerror("错误", f"端口位宽仍然不匹配，请重新操作！{from_bit_range},{to_bit_range}")
+                            return
+                        # except Exception as e:
+                        #     messagebox.showerror("错误", "输入的端口宽度格式不正确，请使用 [high:low] 格式！"+str(e))
+                        #     return
                     else:
                         Toast(self.root, "用户取消输入，退出连接操作", duration=2000, position='center')
                         return  # 用户取消输入，退出连接操作
@@ -1038,13 +1061,13 @@ class WGenGUI:
         
         elif tree_type == "slave" and action == "optionE": # split in
             print(f"split in {port_name}")
-            self._create_spilt_in_connection(port_name)
+            self._create_split_in_connection(port_name)
         else:
             show_str = f"你在{tree_type}端口列表中点击了{action}操作，端口：{port_name}"
             Toast(self.root, show_str, duration=2000, position='center')
 
-    def _create_spilt_in_connection(self, port_name):
-        port_obj = self.slave_module.get_port(port_name)
+    def _create_split_in_connection(self, port_name):
+        port_obj:VerilogPort = self.slave_module.get_port(port_name)
         if isinstance(port_obj, VerilogPort):
             module_list = []
             for ins in self.modules:
@@ -1052,22 +1075,48 @@ class WGenGUI:
 
             module_list.append(self.collection_DB.system_module)
             
-            if isinstance(port_obj.connection, VerilogMergeConnection):
-                port_data_list = self._multiple_port_selector(module_list, [0, 1, 2, 3])
-            else:
-                port_data_list = self._multiple_port_selector(module_list)
+            new_gui_data_list = self._multiple_port_selector(module_list, port_obj)
 
-            if port_data_list:
-                print(port_data_list)
+            if new_gui_data_list:
+                print(new_gui_data_list)
+                from_port_list = []
+                from_range_list = []
+
+                # 解析new_gui_data_list中的数据
+                for row_data in new_gui_data_list:
+                    from_port_list.append(self.collection_DB.get_module(row_data['insName']).get_port(row_data['portName']))
+                    high, low = self._parse_str_width(row_data['bitRange'])
+                    from_range_list.append({'high':high, 'low':low})
+
+                try :
+                    self.collection_DB.add_mergeConnection(
+                        from_port_list=from_port_list,
+                        from_range_list=from_range_list,
+                        new_gui_data_list=new_gui_data_list,
+                        to_port=port_obj
+                    )
+                except Exception as e:
+                    messagebox.showerror("错误", f"创建连接失败：\n{e}")
+                    return
+
+                save_result = self._save_database()
+                show_str = f"已成功连接 {new_gui_data_list} -> {self.slave_module.name}.{port_obj.name} \n{save_result}"
+                Toast(self.root, show_str, duration=2000, position='center')
+                self._update_master_display()
+                self._update_slave_display()
+
             else:
                 messagebox.showerror("错误", "请输入正确的端口数据")
         
         else:
             messagebox.showerror("错误", f"端口 {port_name} 不是 VerilogPort 类型")
 
-    def _multiple_port_selector(self, module_list:list, data_list:list =[]) -> list:
+    def _multiple_port_selector(self, module_list:list, port_obj:VerilogPort) -> list:  
         # 定义要返回的数据
         collected_data = []
+        old_data_list = None
+        if isinstance(port_obj.connection, VerilogMergeConnection):
+            old_data_list = port_obj.connection.gui_data_list
         
         # 创建Split In Connection窗口
         split_window = tk.Toplevel(self.root)
@@ -1110,6 +1159,11 @@ class WGenGUI:
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, pady=(0, 10))
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=(0, 10))
         
+        # 如果有旧数据列表，将其填充到Treeview中
+        if old_data_list is not None and isinstance(old_data_list, list):
+            for data in old_data_list:
+                tree.insert("", tk.END, values=(data.get("insName", ""), data.get("portName", ""), data.get("bitRange", "0:0")))
+        
         # 定义创建编辑器的函数
         def create_editor(event):
             # 获取双击的行和列
@@ -1143,7 +1197,7 @@ class WGenGUI:
             # 为insName列创建下拉菜单编辑器
             if col_name == "insName":
                 # 获取所有模块名称
-                ins_names = [md.name for md in self.modules]
+                ins_names = [md.name for md in module_list]
                 
                 # 确保ins_names列表不为空
                 if not ins_names:
@@ -1220,7 +1274,7 @@ class WGenGUI:
                         combobox.set(ports_names[0])
                 
                 # 设置combobox为只读模式并确保小三角显示
-                # combobox.configure(state="readonly")
+                combobox.configure(state="readonly")
                 
                 # 绑定事件处理函数
                 def on_combobox_select(event, item=item, col_name=col_name):
@@ -1312,6 +1366,52 @@ class WGenGUI:
             return data
         
 
+        def check_data(data)->str : 
+            ans_str = ""
+            if not data:
+                ans_str = "port list is empty! please add row and eidt!"
+                return ans_str
+            # 1. 单个检查每一行
+            for i in range(len(data)):
+                if not data[i]["insName"]:
+                    ans_str = f"insName is empty! please edit row {i+1}!"
+                    return ans_str
+                if not data[i]["portName"]:
+                    ans_str = f"portName is empty! please edit row {i+1}!"
+                    return ans_str
+                if not data[i]["bitRange"]:
+                    ans_str = f"bitRange is empty! please edit row {i+1}!"
+                    return ans_str
+                
+                high, low = self._parse_str_width(data[i]["bitRange"])
+                if high < low:
+                    ans_str = f"bitRange format error! high({high}) should be greater than low({low})! please edit row {i+1}!"
+                    return ans_str
+
+                cur_md_obj = self.collection_DB.get_module(data[i]["insName"], module_list)  
+                if not cur_md_obj:
+                    ans_str = f"insName {data[i]['insName']} not found! please edit row {i+1}!"
+                    return ans_str
+                
+                cur_port_obj = cur_md_obj.get_port(data[i]["portName"])
+                if not cur_port_obj:
+                    ans_str = f"portName {data[i]['portName']} not found! please edit row {i+1}!"
+                    return ans_str
+                
+                if high > cur_port_obj.width['high'] or low < cur_port_obj.width['low']:
+                    ans_str = f"bitRange error! high({high}) should be <= port width({cur_port_obj.width['high']})! please edit row {i+1}!"
+                    return ans_str
+            
+            # 2. 检查拼凑结果(可能有高低位拼接问题)
+            merge_range_value = 0
+            for i in range(len(data)):
+                high, low = self._parse_str_width(data[i]["bitRange"])
+                merge_range_value += high - low + 1
+            if port_obj.get_width_value() != merge_range_value:
+                ans_str = f"bitRange error! all merge range value is ({merge_range_value}) != port width({port_obj.get_width_value()})! please check bigRange at every row!"
+                return ans_str
+
+            return ans_str
         
         # Connect按钮功能
         def connect_data():
@@ -1321,9 +1421,14 @@ class WGenGUI:
                 print("Connect - Split In Connection Data:")
                 for i, row in enumerate(data, 1):
                     print(f"Row {i}: {row}")
-                messagebox.showinfo("Connect", "连接操作已执行，数据已打印到控制台")
+                # messagebox.showinfo("Connect", "连接操作已执行，数据已打印到控制台")
+                Toast(self.root, "连接操作已执行，数据已打印到控制台", duration=2000, position='bottom')
                 collected_data = data  # 保存收集到的数据
-                split_window.destroy()
+                check_ans =  check_data(data)
+                if check_ans == "":
+                    split_window.destroy()  
+                else :
+                    messagebox.showerror("错误", "请检查连接数据\n "+ check_ans)
             else:
                 messagebox.showwarning("警告", "没有数据可连接")
         
@@ -1332,6 +1437,7 @@ class WGenGUI:
             nonlocal collected_data
             collected_data = []  # 取消时返回空列表
             split_window.destroy()
+            Toast(self.root, "连接操作已取消", duration=2000, position='center')
         
         # 创建底部按钮框架 - 居中显示
         bottom_frame = ttk.Frame(split_window)
