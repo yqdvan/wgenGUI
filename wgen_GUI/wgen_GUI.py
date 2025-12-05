@@ -6,7 +6,7 @@ from tkinter import ttk, messagebox, simpledialog, filedialog, scrolledtext
 import copy
 from collections import deque
 from modules.verilog_parser import VerilogParser
-from modules.verilog_models import VerilogMergeConnection, VerilogModuleCollection, VerilogPort
+from modules.verilog_models import VerilogMergeConnection, VerilogConnection, VerilogModuleCollection, VerilogPort
 from modules.file_handler import FileHandler
 from modules.toast import Toast
 from modules.wgen_config_generator import WgenConfigGenerator
@@ -836,7 +836,7 @@ class WGenGUI:
         
         # 查找对应的端口
         query_ports = self.master_module.ports if is_master else self.slave_module.ports
-        selected_port = None
+        selected_port:(VerilogPort|None) = None
         for port in query_ports:
             if port.name == port_name:
                 selected_port = port
@@ -915,8 +915,15 @@ class WGenGUI:
                 if isinstance(port, VerilogPort):
                     width_show = "[" +str(port.width['high']) +":"+ str(port.width['low']) + "]"
                     connect_show = "None"
-                    if port.source:
-                        connect_show = port.source.father_module.name + "." + port.source.name
+                    # if port.source:
+                    #     connect_show = port.source.father_module.name + "." + port.source.name
+                    if isinstance(port.connection, VerilogMergeConnection):
+                        connect_show = f"Merge ports"
+                    elif isinstance(port.connection, VerilogConnection):
+                        connect_show = port.connection.source_port.father_module.name + "." + port.connection.source_port.name 
+                    elif port.connection is None:
+                        connect_show = "None"
+
                     # 根据端口方向设置背景色：input默认，output淡蓝
                     bg_color = '' if port.direction == 'input' else '#e0f0f5' #'lightblue'
                     self.slave_ports_tree.insert('', tk.END, values=(port.name,width_show, connect_show), open=True, tags=(port.direction,))
@@ -975,7 +982,7 @@ class WGenGUI:
                 tree_type = "slave"
                 port_name = self.slave_ports_tree.item(selected_slave_items[0])['values'][0]
         
-        if tree_type == "master" and action == "optionA":
+        if tree_type == "master" and action == "optionA": # 断开master port连接
             port_obj = self.master_module.get_port(port_name)
             if port_obj:
                 # 检查port_obj的destinations数量
@@ -1002,7 +1009,7 @@ class WGenGUI:
         # elif tree_type == "master" and (action == "optionB" or action == "optionC"):
         #     messagebox.showinfo("操作提示", f"Master output cannot be tied to {action}")
 
-        elif tree_type == "slave" and action == "optionA":  
+        elif tree_type == "slave" and action == "optionA":  # 断开slave port连接
             port_obj = self.slave_module.get_port(port_name)
             if port_obj:
                 ans_str = self.collection_DB.remove_slave_port_connection(port_obj)
@@ -1088,6 +1095,10 @@ class WGenGUI:
                     high, low = self._parse_str_width(row_data['bitRange'])
                     from_range_list.append({'high':high, 'low':low})
 
+                # 如果有连接，先断开再创建新连接
+                if port_obj.connection is not None:
+                    self.collection_DB.remove_slave_port_connection(port_obj)
+
                 try :
                     self.collection_DB.add_mergeConnection(
                         from_port_list=from_port_list,
@@ -1106,7 +1117,8 @@ class WGenGUI:
                 self._update_slave_display()
 
             else:
-                messagebox.showerror("错误", "请输入正确的端口数据")
+                # Toast(self.root, "return data list is empty.", duration=2000, position='center')
+                print("Return data list is empty.\n")
         
         else:
             messagebox.showerror("错误", f"端口 {port_name} 不是 VerilogPort 类型")
@@ -1365,7 +1377,6 @@ class WGenGUI:
                     })
             return data
         
-
         def check_data(data)->str : 
             ans_str = ""
             if not data:

@@ -24,7 +24,7 @@ class VerilogPort:
         else:
             self.width = width
         
-        self.source:VerilogPort = source
+        self.source:VerilogPort = source # 在v2.0.0版本后，source变相的被connection替代，以后不要再访问了
         self.connection:VerilogConnection = None # 存储source为多个连接对象时的连接对象
         self.destinations: list[VerilogPort] = []  # 存储多个目标端口
     
@@ -40,26 +40,43 @@ class VerilogPort:
         source_info = '\nsource_info:\n'
         dest_info = '\ndestination_info:\n'
 
-        if not self.father_module.need_gen:
-            if self.direction in ['input', 'inout'] and self.source:
-                source_module = self.source.father_module if self.source.father_module is None else self.source.father_module
-                source_info += f" (source: {source_module.name}.{self.source.name if self.source else 'None'})"
+        # if not self.father_module.need_gen:
+        #     if self.direction in ['input', 'inout'] and self.source:
+        #         source_module = self.source.father_module if self.source.father_module is None else self.source.father_module
+        #         if isinstance(self.connection, VerilogConnection):
+        #             source_info += f" (source: {source_module.name}.{self.connection.name}[{self.connection.source_bit_range['high']}:{self.connection.source_bit_range['low']}])"
+        #         elif isinstance(self.connection, VerilogMergeConnection):
+        #             for source_port in self.connection.source_port_list:
+        #                 source_info += f"  source: {source_module.name}.{source_port.name }[{source_port.width['high']}:{source_port.width['low']}] \n"
             
-            if self.direction in ['output', 'inout'] and self.destinations:
-                dest_info += "port loads:\n"
-                for dest_port in self.destinations:
-                    dest_module = dest_port.father_module if dest_port.father_module is None else dest_port.father_module
-                    dest_info += f"    {dest_module.name}.{dest_port.name}\n"
-        else: # need gen
+        #     if self.direction in ['output', 'inout'] and self.destinations:
+        #         dest_info += "port loads:\n"
+        #         for dest_port in self.destinations:
+        #             dest_module = dest_port.father_module if dest_port.father_module is None else dest_port.father_module
+        #             dest_info += f"    {dest_module.name}.{dest_port.name}\n"
+        # else: # need gen
             
-            if self.source:
-                source_module = self.source.father_module if self.source.father_module is None else self.source.father_module
-                source_info += f" (source: {source_module.name}.{self.source.name if self.source else 'None'})"
-           
-            if self.destinations:
-                for dest_port in self.destinations:
-                    dest_module = dest_port.father_module if dest_port.father_module is None else dest_port.father_module
-                    dest_info += f"    {dest_module.name}.{dest_port.name}\n"            
+        #     if self.source:
+        #         source_module = self.source.father_module if self.source.father_module is None else self.source.father_module
+        #         source_info += f" (source: {source_module.name}.{self.source.name if self.source else 'None'})"
+        #     if self.destinations:
+        #         for dest_port in self.destinations:
+        #             dest_module = dest_port.father_module if dest_port.father_module is None else dest_port.father_module
+        #             dest_info += f"    {dest_module.name}.{dest_port.name}\n"            
+        
+        # 1. make source info
+        if isinstance(self.connection, VerilogMergeConnection):
+            source_info += f"  source is merged by:\n"
+            for source_port in self.connection.source_port_list:
+                source_info += f"    {source_port.father_module.name}.{source_port.name }[{source_port.width['high']}:{source_port.width['low']}] \n"
+        elif isinstance(self.connection, VerilogConnection):
+            source_info += f"  source: {self.connection.source_port.father_module.name}.{self.connection.source_port.name}[{self.connection.source_bit_range['high']}:{self.connection.source_bit_range['low']}] \n"
+
+        # 2. make destion info
+        dest_info += "  port load(s):\n"
+        for dest_port in self.destinations:
+            dest_module = dest_port.father_module if dest_port.father_module is None else dest_port.father_module
+            dest_info += f"    {dest_module.name}.{dest_port.name}\n"
 
         return f"father md: {self.father_module.name}\nport type: {self.direction}\nport name: {self.name}{width_str}\n{source_info}\n{dest_info}"
 
@@ -494,7 +511,7 @@ class VerilogMergeConnection(VerilogConnection):
             if i < len(self.source_port_list) - 1:
                 source_str += ", "
 
-        return f"{{{source_str}}}-> {self.dest_module_name}.{self.dest_port.name} [{self.dest_bit_range['high']}:{self.dest_bit_range['low']}]"
+        return f"{{{source_str}}} -> {self.dest_module_name}.{self.dest_port.name} [{self.dest_bit_range['high']}:{self.dest_bit_range['low']}]"
 
 class VerilogModuleCollection:
     """Verilog模块集合类，用于管理多个Verilog模块"""
@@ -838,6 +855,10 @@ class VerilogModuleCollection:
             source_port_list=from_port_list, 
             source_range_list=from_range_list
         )
+        
+        # 设置gui_data_list
+        merge_conn.gui_data_list = new_gui_data_list
+        
         self.connections.append(merge_conn)
 
         # 2. All data can be trusted. 修改数据结构
@@ -936,6 +957,7 @@ class VerilogModuleCollection:
         # 目标端口是输入端口或双向端口
         # if dest_port.is_input() or dest_port.is_inout():
         dest_port.source = source_port
+        dest_port.connection = connection
     
     def remove_master_port_connections(self, master_port: VerilogPort) -> str:
         """
@@ -959,14 +981,17 @@ class VerilogModuleCollection:
         # for dest_port in master_port.destinations:
         while master_port.destinations:
             dest_port = master_port.destinations[0]
-            if master_port is dest_port.source:
-                self.remove_slave_port_connection(dest_port)
-                ans = True
-            else:
-                message_str = f"主端口 {master_port.name} load {dest_port.name}, BUT NOT FROM IT !!!"
-                ans = False
-                break
-        
+            # 放弃检查目的的源是不是自己了 因为增加了mergeConnection
+            # if master_port is dest_port.source:
+            #     self.remove_slave_port_connection(dest_port)
+            #     ans = True
+            # else:
+            #     message_str = f"主端口 {master_port.name} load {dest_port.name}, BUT NOT FROM IT !!!"
+            #     ans = False
+            #     break
+            self.remove_slave_port_connection(dest_port)
+            ans = True
+
         # 清空主端口的destinations列表
         if ans:
             master_port.destinations.clear()
@@ -997,8 +1022,10 @@ class VerilogModuleCollection:
         dest_module_name = slave_port.father_module.name
         dest_port_name = slave_port.name
         
-        # 移除从端口的源引用
-        slave_port.source = None
+        # 后面connection里面还要判断的
+        # # 移除从端口的源引用
+        # slave_port.source = None
+        # slave_port.connection = None
         
         # 从源端口的destinations列表中移除从端口
         if slave_port in source_port.destinations:
@@ -1026,31 +1053,46 @@ class VerilogModuleCollection:
         返回:
             bool: 如果成功删除连接则返回True，否则返回False
         """
-        # 查找匹配的连接
-        connection_to_remove = None
-        for conn in self.connections:
-            if (conn.source_module_name == source_module_name and 
-                conn.source_port.name == source_port_name and 
-                conn.dest_module_name == dest_module_name and 
-                conn.dest_port.name == dest_port_name):
-                connection_to_remove = conn
-                break
+        ## 直接从port的 connection获取
+        # # 查找匹配的连接
+        # connection_to_remove = None
+        # for conn in self.connections:
+        #     if (conn.source_module_name == source_module_name and 
+        #         conn.source_port.name == source_port_name and 
+        #         conn.dest_module_name == dest_module_name and 
+        #         conn.dest_port.name == dest_port_name):
+        #         connection_to_remove = conn
+        #         break
         
-        if not connection_to_remove:
-            return False
+        # if not connection_to_remove:
+        #     return False
         
-        # 更新端口的源和目的地信息
-        source_port = connection_to_remove.source_port
-        dest_port = connection_to_remove.dest_port
+        # # 更新端口的源和目的地信息
+        # source_port = connection_to_remove.source_port
+        # dest_port = connection_to_remove.dest_port
         
+        dest_module = self.get_module(dest_module_name)
+        dest_port = dest_module.get_port(dest_port_name)
+        source_port = dest_port.source
+        connection_to_remove = dest_port.connection
+
         # 移除源端口的目的地引用
         if dest_port in source_port.destinations:
             source_port.destinations.remove(dest_port)
         
         # 移除目标端口的源引用
-        if dest_port.source == source_port:
-            dest_port.source = None
-        
+        dest_port.source = None
+
+        # 移除目标端口的connection引用
+        dest_port.connection = None        
+
+        # 清理mergeConnection
+        if isinstance(connection_to_remove, VerilogMergeConnection):
+            for source_port in connection_to_remove.source_port_list:
+                # 移除源端口的目的地引用
+                if dest_port in source_port.destinations:
+                    source_port.destinations.remove(dest_port)    
+
         # 从连接列表中删除连接
         self.connections.remove(connection_to_remove)
         return True
@@ -1137,7 +1179,8 @@ class VerilogModuleCollection:
                     'name': port.name,
                     'direction': port.direction,
                     'width': port.width,
-                    'connection': None
+                    'connection': None,
+                    'destinations': []
                 }
                 # 序列化connection属性
                 if port.connection:
@@ -1147,6 +1190,12 @@ class VerilogModuleCollection:
                         'dest_module_name': port.connection.dest_module_name,
                         'dest_port_name': port.connection.dest_port.name
                     }
+                # 序列化destinations属性
+                for dest_port in port.destinations:
+                    port_info['destinations'].append({
+                        'module_name': dest_port.father_module.name,
+                        'port_name': dest_port.name
+                    })
                 module_info['ports'].append(port_info)
             
             modules_dict.append(module_info)
@@ -1162,6 +1211,20 @@ class VerilogModuleCollection:
                 'source_bit_range': conn.source_bit_range,
                 'dest_bit_range': conn.dest_bit_range
             }
+            
+            # 如果是合并连接，添加额外属性
+            if isinstance(conn, VerilogMergeConnection):
+                conn_info['type'] = 'merge'
+                conn_info['merge_type'] = conn.type
+                conn_info['source_port_list'] = [{
+                    'module_name': port.father_module.name,
+                    'port_name': port.name
+                } for port in conn.source_port_list]
+                conn_info['source_range_list'] = conn.source_range_list
+                conn_info['gui_data_list'] = conn.gui_data_list
+            else:
+                conn_info['type'] = 'normal'
+                
             connections_dict.append(conn_info)
         
         # 序列化tie_0_port和tie_1_port
@@ -1289,6 +1352,30 @@ class VerilogModuleCollection:
             # 恢复parameters属性
             module.parameters = module_info.get('parameters', {})
         
+        # 恢复端口的destinations属性
+        # 先创建端口的映射关系
+        port_map = {}
+        for module in collection.modules:
+            for port in module.ports:
+                port_map[(module.name, port.name)] = port
+        
+        # 恢复端口的destinations属性
+        for module_info in data_dict.get('modules', []):
+            module_name = module_info['name']
+            module = module_map.get(module_name)
+            if module:
+                for port_info in module_info.get('ports', []):
+                    port_name = port_info['name']
+                    port = module.get_port(port_name)
+                    if port:
+                        # 恢复destinations
+                        for dest_info in port_info.get('destinations', []):
+                            dest_module_name = dest_info['module_name']
+                            dest_port_name = dest_info['port_name']
+                            dest_port = port_map.get((dest_module_name, dest_port_name))
+                            if dest_port and dest_port not in port.destinations:
+                                port.destinations.append(dest_port)
+        
         # 然后重建所有连接
         for conn_info in data_dict.get('connections', []):
             try:
@@ -1299,6 +1386,7 @@ class VerilogModuleCollection:
                 dest_port_name = conn_info['dest_port_name']
                 source_bit_range = conn_info.get('source_bit_range')
                 dest_bit_range = conn_info.get('dest_bit_range')
+                connection_type = conn_info.get('type', 'normal')
                 
                 # 如果是tie01端口的连接，直接创建连接对象
                 if source_module_name == collection.system_module.name and source_port_name in ['tie_0', 'tie_1']:
@@ -1326,6 +1414,52 @@ class VerilogModuleCollection:
                                 source_port.destinations.append(dest_port)
                             dest_port.source = source_port
                             continue
+                
+                # 处理合并连接
+                if connection_type == 'merge':
+                    # 获取所有源端口信息
+                    source_port_list = []
+                    for port_info in conn_info.get('source_port_list', []):
+                        port_module = module_map.get(port_info['module_name'])
+                        if port_module:
+                            port = port_module.get_port(port_info['port_name'])
+                            if port:
+                                source_port_list.append(port)
+                    
+                    if source_port_list:
+                        # 获取第一个端口作为主源端口
+                        main_source_port = source_port_list[0]
+                        main_source_module = main_source_port.father_module
+                        
+                        # 获取目标模块和端口
+                        dest_module = module_map.get(dest_module_name)
+                        if dest_module:
+                            dest_port = dest_module.get_port(dest_port_name)
+                            if dest_port:
+                                # 创建合并连接对象
+                                merge_connection = VerilogMergeConnection(
+                                    source_module=main_source_module,
+                                    source_port=main_source_port,
+                                    dest_module=dest_module,
+                                    dest_port=dest_port,
+                                    source_bit_range=source_bit_range,
+                                    dest_bit_range=dest_bit_range,
+                                    merge_type=conn_info.get('merge_type', 'joint'),
+                                    source_port_list=source_port_list,
+                                    source_range_list=conn_info.get('source_range_list', [])
+                                )
+                                
+                                # 设置gui_data_list
+                                merge_connection.gui_data_list = conn_info.get('gui_data_list', [])
+                                
+                                # 添加到连接列表
+                                collection.connections.append(merge_connection)
+                                
+                                # 更新端口的源和目的地信息
+                                if dest_port not in main_source_port.destinations:
+                                    main_source_port.destinations.append(dest_port)
+                                dest_port.source = main_source_port
+                                continue
                 
                 # 使用现有的add_connection方法来确保所有验证和引用都正确设置
                 collection.add_connection(
