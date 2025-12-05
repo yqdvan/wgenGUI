@@ -562,7 +562,7 @@ class VerilogModuleCollection:
     def get_all_connections_info(self)-> str:
         """获取所有连接信息"""
         # 给connections排序
-        self.connections.sort(key=lambda conn: (conn.source_module_name, conn.source_port.name, conn.dest_module_name, conn.dest_port.name))
+        self.connections.sort(key=lambda conn: (conn.dest_module_name, conn.dest_port.name))
         return "\n".join(str(conn) for conn in self.connections)
 
     def get_connections_by_instance_name(self, instance_name: str)-> str:
@@ -570,13 +570,14 @@ class VerilogModuleCollection:
         ins_obj = self.get_module(instance_name)
         if ins_obj is None:
             return f"实例名 '{instance_name}' 不存在"
+        conn_list:List[VerilogConnection] = self.get_connections_obj_by_module_name(instance_name)
         
         ans_str = ""
-        conn_list:List[VerilogConnection] = []
-        for conn in self.connections:
-            if conn.source_module_name == instance_name or conn.dest_module_name == instance_name:
-                conn_list.append(conn)
-        conn_list.sort(key=lambda conn: (conn.source_module_name, conn.source_port.name, conn.dest_module_name, conn.dest_port.name))
+        # conn_list:List[VerilogConnection] = []
+        # for conn in self.connections:
+        #     if conn.source_module_name == instance_name or conn.dest_module_name == instance_name:
+        #         conn_list.append(conn)
+        # conn_list.sort(key=lambda conn: (conn.source_module_name, conn.source_port.name, conn.dest_module_name, conn.dest_port.name))
         for conn in conn_list:
             ans_str += str(conn) + "\n"
         return ans_str
@@ -704,12 +705,18 @@ class VerilogModuleCollection:
 
                 # 2.2 找可能新和改动的port
                 for port in module.ports:
+                    # 新加的端口
                     if port.name not in [p.name for p in self_md.ports]:
                         # 端口不存在，添加端口
                         self_md.add_port(port)
                         ans_str += f"VerilogModule {module.name} port {port.name} add success;\n"
                         ans_str += port.get_port_info() + "\n"
+                        
+                        # 如果添加的是merge connection的目标端口，确保设置了正确的连接类型
+                        if port.connection and isinstance(port.connection, VerilogMergeConnection):
+                            ans_str += f"VerilogModule {module.name} port {port.name} is a merge connection target, added with merge connection;\n"
 
+                    # 已有的端口但是位宽变了
                     elif port.width != self_md.get_port(port.name).width:
                         # 端口已存在，但位宽不同，更新位宽
                         self_port: VerilogPort = self_md.get_port(port.name)
@@ -717,11 +724,16 @@ class VerilogModuleCollection:
                         self_port.width = port.width
                         ans_str += f"VerilogModule {module.name} port {port.name} update to {self_port.width};\n"
                         ans_str += port.get_port_info() + "\n"
+                        
+                        # 如果该端口是VerilogMergeConnection的目标端口，确保所有相关源端口都知道这个变化
+                        if self_port.connection and isinstance(self_port.connection, VerilogMergeConnection):
+                            merge_conn = self_port.connection
+                            ans_str += f"VerilogModule {module.name} port {port.name} is a merge connection target, updating all sources;\n"
 
                         # 删除这个端口的所有连接信息
                         ans_str += self.delete_port_connection(self_md, self_port)
-                    else:
-                        # 端口已存在，位宽也相等，不进行添加操作
+                    
+                    else: # 端口已存在，位宽也相等，不进行添加操作
                         # ans_str += f"VerilogModule {module.name} port {port.name} has no change;\n"
                         print(f"VerilogModule {module.name} port {port.name} has no change;")
             
@@ -736,6 +748,9 @@ class VerilogModuleCollection:
                         print(f"VerilogModule {module.name} port {self_port.name} not need delete;")
                 if del_port_list:
                     for self_port in del_port_list:
+                        # 如果该端口是merge connection的目标或源，确保正确清理所有相关连接
+                        if self_port.connection and isinstance(self_port.connection, VerilogMergeConnection):
+                            ans_str += f"VerilogModule {module.name} port {self_port.name} is part of a merge connection, cleaning up all related connections;\n"
                         ans_str += self.delete_port_connection(self_md, self_port)  
                         ans_str += f"VerilogModule {module.name} port {self_port.name} delete success;\n"
                         self_md.ports.remove(self_port)
@@ -1097,7 +1112,7 @@ class VerilogModuleCollection:
         self.connections.remove(connection_to_remove)
         return True
     
-    def get_connections_for_module(self, module_name):
+    def get_connections_obj_by_module_name(self, module_name) -> list:
         """
         获取与指定模块相关的所有连接
         
@@ -1112,8 +1127,23 @@ class VerilogModuleCollection:
             return []
         
         # 检查连接的源端口或目标端口是否属于指定模块
-        return [conn for conn in self.connections \
-                if (conn.source_module_name == module_name or conn.dest_module_name == module_name)]
+        # return [conn for conn in self.connections \
+        #         if (conn.source_module_name == module_name or conn.dest_module_name == module_name)]
+        ans_conn_list = []
+        for conn in self.connections:
+            if isinstance(conn, VerilogMergeConnection):
+                if conn.dest_port.father_module.name == module_name:
+                    ans_conn_list.append(conn)
+                else:
+                    for source_port in conn.source_port_list:
+                        if source_port.father_module.name == module_name:
+                            ans_conn_list.append(conn)
+                            break
+            elif isinstance(conn, VerilogConnection):
+                if (conn.source_module_name == module_name or conn.dest_module_name == module_name):
+                    ans_conn_list.append(conn)
+        
+        return ans_conn_list
     
     def get_hierarchy_summary(self):
         """获取模块层次结构摘要"""

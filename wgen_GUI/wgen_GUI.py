@@ -1091,7 +1091,7 @@ class WGenGUI:
 
                 # 解析new_gui_data_list中的数据
                 for row_data in new_gui_data_list:
-                    from_port_list.append(self.collection_DB.get_module(row_data['insName']).get_port(row_data['portName']))
+                    from_port_list.append(self.collection_DB.get_module(row_data['insName'], module_list).get_port(row_data['portName']))
                     high, low = self._parse_str_width(row_data['bitRange'])
                     from_range_list.append({'high':high, 'low':low})
 
