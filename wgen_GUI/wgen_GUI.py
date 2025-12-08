@@ -1248,7 +1248,6 @@ class WGenGUI:
                 
                 # 绑定事件
                 combobox.bind("<<ComboboxSelected>>", on_combobox_select)
-                combobox.bind("<FocusOut>", on_combobox_select)
                 combobox.bind("<Return>", on_combobox_select)
                 
                 # 设置焦点
@@ -1297,7 +1296,6 @@ class WGenGUI:
                 
                 # 绑定事件
                 combobox.bind("<<ComboboxSelected>>", on_combobox_select)
-                combobox.bind("<FocusOut>", on_combobox_select)
                 combobox.bind("<Return>", on_combobox_select)
                 
                 # 设置焦点

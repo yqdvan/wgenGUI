@@ -556,6 +556,7 @@ class VerilogModuleCollection:
         self.connections.append(connection)
 
         port.source = tie_port
+        port.connection = connection
         tie_port.destinations.append(port)
         return ans_str
 
