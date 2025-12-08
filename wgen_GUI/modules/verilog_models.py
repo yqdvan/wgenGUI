@@ -67,8 +67,10 @@ class VerilogPort:
         # 1. make source info
         if isinstance(self.connection, VerilogMergeConnection):
             source_info += f"  source is merged by:\n"
-            for source_port in self.connection.source_port_list:
-                source_info += f"    {source_port.father_module.name}.{source_port.name }[{source_port.width['high']}:{source_port.width['low']}] \n"
+            for i in range(self.connection.source_port_list.__len__()):
+                source_port = self.connection.source_port_list[i]
+                source_load_range = self.connection.source_range_list[i]
+                source_info += f"    {source_port.father_module.name}.{source_port.name }[{source_load_range['high']}:{source_load_range['low']}] \n"
         elif isinstance(self.connection, VerilogConnection):
             source_info += f"  source: {self.connection.source_port.father_module.name}.{self.connection.source_port.name}[{self.connection.source_bit_range['high']}:{self.connection.source_bit_range['low']}] \n"
 
