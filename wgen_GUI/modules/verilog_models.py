@@ -1223,6 +1223,11 @@ class VerilogModuleCollection:
                         'dest_module_name': port.connection.dest_module_name,
                         'dest_port_name': port.connection.dest_port.name
                     }
+                    # 添加类型标记，区分VerilogConnection和VerilogMergeConnection
+                    if isinstance(port.connection, VerilogMergeConnection):
+                        port_info['connection']['type'] = 'merge'
+                    else:
+                        port_info['connection']['type'] = 'normal'
                 # 序列化destinations属性
                 for dest_port in port.destinations:
                     port_info['destinations'].append({
@@ -1288,15 +1293,6 @@ class VerilogModuleCollection:
             'tie_ports': tie_ports_dict,
             'system_module': system_md_dict
         }
-    
-    def to_json(self):
-        """将模块集合直接转换为JSON字符串
-        
-        返回:
-            str: 包含所有模块和连接信息的JSON字符串
-        """
-        import json
-        return json.dumps(self.to_dict(), indent=2)
     
     @classmethod
     def from_dict(cls, data_dict):
@@ -1510,28 +1506,11 @@ class VerilogModuleCollection:
         # 为端口设置connection属性
         # 遍历所有连接，将连接对象赋值给对应的端口
         for conn in collection.connections:
-            # 为源端口设置connection属性
-            if hasattr(conn.source_port, 'connection'):
-                conn.source_port.connection = conn
-            # 为目标端口设置connection属性
+            # 为目标端口设置connection属性，只给from to后面的端口设置connection！
             if hasattr(conn.dest_port, 'connection'):
                 conn.dest_port.connection = conn
                 
         return collection
-    
-    @classmethod
-    def from_json(cls, json_str):
-        """从JSON字符串中创建VerilogModuleCollection对象
-        
-        参数:
-            json_str (str): 包含模块和连接信息的JSON字符串
-            
-        返回:
-            VerilogModuleCollection: 重建的模块集合对象
-        """
-        import json
-        data_dict = json.loads(json_str)
-        return cls.from_dict(data_dict)
     
     def save_to_file(self, file_path, metadata=None):
         """将模块集合保存到文件

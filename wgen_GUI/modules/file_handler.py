@@ -105,7 +105,7 @@ class FileHandler:
             
         try:
             # 深拷贝collection_DB
-            db_copy = copy.deepcopy(collection_DB)
+            db_copy:VerilogModuleCollection = copy.deepcopy(collection_DB)
             
             # # 获取当前文件的父目录
             # current_dir = os.path.dirname(os.path.abspath(__file__))
