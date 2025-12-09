@@ -157,7 +157,7 @@ class WGenGUI:
         left_paned.add(hierarchy_frame, weight=1)
         
         # 使用Text控件，以多行文本加缩进的方式展示层次关系
-        self.hierarchy_text = tk.Text(hierarchy_frame, wrap=tk.WORD, font=('Arial', 10))
+        self.hierarchy_text = tk.Text(hierarchy_frame, wrap=tk.NONE, font=('Arial', 10))
         self.hierarchy_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # 创建滚动条
