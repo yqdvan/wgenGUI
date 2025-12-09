@@ -1155,7 +1155,7 @@ class WGenGUI:
         
         # 设置列标题和宽度（4:4:1比例）
         tree.heading("insName", text="InstanceName")
-        tree.column("insName", width=220)  
+        tree.column("insName", width=180)  
         
         tree.heading("portName", text="PortName")
         tree.column("portName", width=240) 
@@ -1354,7 +1354,12 @@ class WGenGUI:
         
         # 创建添加/删除行按钮 - 上下排列
         button_frame = ttk.Frame(main_frame, width=100)
-        button_frame.pack(side=tk.RIGHT, padx=(20, 10), pady=10, fill=tk.NONE)
+        button_frame.pack(side=tk.RIGHT, padx=(10, 10), pady=10, fill=tk.NONE)
+        
+        # 添加提示文字
+        tips_str = "Tips:\n Line 1 is MSB(high),\n Last is LSB(low)."
+        tip_label = ttk.Label(button_frame, text=tips_str, justify=tk.LEFT, wraplength=120)
+        tip_label.pack(pady=(5, 10), padx=5)
         
         add_button = ttk.Button(button_frame, text="Add Row", command=add_row)
         add_button.pack(fill=tk.X, pady=(5, 5), padx=5)
@@ -1718,9 +1723,9 @@ class WGenGUI:
         if hasattr(module, 'module_def_name') and module.module_def_name:
             module_text += f" ({module.module_def_name})"
         
-        # 添加是否为生成模块的标记
-        if hasattr(module, 'need_gen') and module.need_gen:
-            module_text += " [needGen]"
+        # 添加是否为生成模块的标记//删了，太长了，影响UI美观
+        # if hasattr(module, 'need_gen') and module.need_gen:
+        #     module_text += " [needGen]"
         
         # 检查模块是否有包含的模块
         includes = getattr(module, 'includes', [])

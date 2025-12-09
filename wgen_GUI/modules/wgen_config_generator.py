@@ -1,10 +1,10 @@
 # 尝试相对导入，如果失败则使用绝对导入
 try:
     from .code_generator_interface import CodeGeneratorInterface
-    from .verilog_models import VerilogModuleCollection, VerilogModule, VerilogPort, VerilogConnection
+    from .verilog_models import VerilogModuleCollection, VerilogModule, VerilogPort, VerilogConnection, VerilogMergeConnection
 except ImportError:
     from code_generator_interface import CodeGeneratorInterface
-    from verilog_models import VerilogModuleCollection, VerilogModule, VerilogPort, VerilogConnection
+    from verilog_models import VerilogModuleCollection, VerilogModule, VerilogPort, VerilogConnection, VerilogMergeConnection
 from datetime import datetime
 import getpass
 import os
@@ -127,10 +127,9 @@ class WgenConfigGenerator(CodeGeneratorInterface):
                         instance_lines.append(f"    generic {par_name}  {par_value} in {module.name} ")
                 instance_lines.append(f"\n")
 
-    # 拼接模块实例化代码成字符串
+        # 拼接模块实例化代码成字符串
         result = "\n".join(instance_lines)
         return result
-
 
     def gen_generated_module_def(self, db: VerilogModuleCollection) -> str:
         """
@@ -166,7 +165,6 @@ class WgenConfigGenerator(CodeGeneratorInterface):
 
         return "\n".join(module_def_lines)
 
-
     def gen_hierarchy_block(self, db: VerilogModuleCollection) -> str:
         """
         从数据库中获取所有模块层级代码并拼接成字符串
@@ -198,7 +196,6 @@ class WgenConfigGenerator(CodeGeneratorInterface):
                 hierarchy_lines.append(f"")
 
         return "\n".join(hierarchy_lines)
-
 
     def gen_generated_md_port_def(self, db: VerilogModuleCollection) -> str:
         """
@@ -274,9 +271,26 @@ class WgenConfigGenerator(CodeGeneratorInterface):
             elif connection.source_port.name == "tie_1":
                 connection_lines.append(f"from \"all_1\"  to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
             else:
-                connection_lines.append(f"from {connection.source_module_name}.{connection.source_port.name}{src_port_range_str} to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
-        connection_lines.append(f" ")
+                if isinstance(connection, VerilogMergeConnection):  
+                    cur_dest_bit_high = connection.dest_port.width['high']
+                    cur_dest_bit_low  = connection.dest_port.width['high'] 
+
+                    for idx in range(connection.source_port_list.__len__()):
+                        cur_ss_port = connection.source_port_list[idx]
+                        cur_ss_range = connection.source_range_list[idx]
+
+                        cur_dest_bit_low = cur_dest_bit_high - connection._get_width_value(cur_ss_range) + 1
+
+                        src_port_range_str = f"({cur_ss_range['high']}:{cur_ss_range['low']})" 
+                        dst_port_range_str = f"({cur_dest_bit_high}:{cur_dest_bit_low})"   
+
+                        connection_lines.append(f"from {cur_ss_port.father_module.name}.{cur_ss_port.name}{src_port_range_str} to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
+                        
+                        cur_dest_bit_high = cur_dest_bit_low -1 # next use
+                else:
+                    connection_lines.append(f"from {connection.source_module_name}.{connection.source_port.name}{src_port_range_str} to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
         
+        connection_lines.append(f" ")
         return "\n".join(connection_lines)
 
 
