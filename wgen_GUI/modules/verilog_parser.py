@@ -26,7 +26,7 @@ modules:
         self.test_input_ports = ['aa_in', 'bb_in', 'cc_in', 'dd_in', 'rr_in', 'ee_in']
         self.test_output_ports = ['cc_out', 'dd_out']
     
-    def parse_config_file(self, config_file_path, parse_parameters=False):
+    def parse_config_file(self, config_file_path, parse_parameters=True): #parse_parameters maybe always true !
         """
         解析配置文件，获取模块名与文件路径的映射关系
         
@@ -303,7 +303,7 @@ class VerilogPortParser:
             par_content = ''
             port_content = head_content
 
-        if parse_parameters and par_content:
+        if par_content: #parse_parameters and fix bug
             # 提取参数信息
             ans_pars:dict = self._extract_parameters(par_content)
             if ans_pars:

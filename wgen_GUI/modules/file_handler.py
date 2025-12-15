@@ -30,7 +30,7 @@ class FileHandler:
         )
         return file_path
         
-    def load_config_file(self, file_path, parser:VerilogParser, parse_parameters=False):
+    def load_config_file(self, file_path, parser:VerilogParser, parse_parameters=True): #parse_parameters maybe always true !
         """加载配置文件并解析
         
         参数:
