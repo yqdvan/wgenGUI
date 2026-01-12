@@ -15,7 +15,7 @@ import re
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
-    version = "2.0.0" 
+    version = "2.0.2" 
     
     def __init__(self, root):
         """初始化GUI界面"""
@@ -1894,17 +1894,11 @@ if __name__ == "__main__":
         sleep(0.2)        
         
     except ImportError:
-        # 更新加载信息
-        splash.update_loading_text("正在安装依赖库...")
-        
-        try:
-            import subprocess
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "pyyaml"])
-            splash.update_loading_text("依赖库安装成功")
-        except Exception as e:
-            print(f"依赖库安装失败: {e}")
-            splash.update_loading_text("依赖库安装失败")
-            sys.exit(1)
+        # 由于yaml库已存放在项目本地，此处出现错误说明本地库有问题
+        print(f"无法导入yaml库: 本地库可能损坏或缺失")
+        splash.update_loading_text("yaml库导入失败")
+        sleep(1)
+        sys.exit(1)
     
     # 更新加载信息为最后一步
     splash.update_loading_text("准备启动应用...")

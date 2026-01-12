@@ -331,8 +331,9 @@ class VerilogConnection:
         if not dest_port.father_module.need_gen :
             if not (dest_port.is_input() or dest_port.is_inout()):
                 raise ValueError(f"目标端口 '{dest_port.name}' 必须是输入或双向端口")
-            if dest_port.source:
-                raise ValueError(f"目标端口 '{dest_port.name}' 已连接到源端口 '{dest_port.source.name}'")
+
+        if dest_port.source: # no matter gen or not, also need check source port
+            raise ValueError(f"目标端口 '{dest_port.name}' 已连接到源端口 '{dest_port.source.name}'")
                 # dest_port.source = None
         
         self.source_port = source_port
