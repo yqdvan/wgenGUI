@@ -15,15 +15,15 @@ import re
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
-    version = "2.0.2" 
+    version = "2.1.0" 
     
     def __init__(self, root):
         """初始化GUI界面"""
         self.root = root
         self.root.title(f"wgen_GUI {self.version}")
 
-        style = ttk.Style()
-        style.theme_use('clam')  # 使用clam主题
+        # style = ttk.Style()
+        # style.theme_use('clam')  # 使用clam主题
 
         self.root.geometry("1200x800")
 
@@ -206,7 +206,23 @@ class WGenGUI:
         right_main_paned.add(master_paned, weight=1)
         
         # Master上方 - 输出端口列表
-        master_ports_frame = ttk.LabelFrame(master_paned, text="Master Ports")
+        # 创建自定义标签框架
+        master_label_frame = ttk.Frame(master_paned)
+        
+        # 添加原有label name
+        master_label_name = ttk.Label(master_label_frame, text="Master Ports")
+        master_label_name.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # 添加输入框
+        self.master_search_entry = ttk.Entry(master_label_frame, width=15)
+        self.master_search_entry.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # 添加搜索按钮
+        master_search_button = ttk.Button(master_label_frame, text="搜索", command=self._on_master_search)
+        master_search_button.pack(side=tk.LEFT)
+        
+        # 创建LabelFrame并使用自定义标签框架
+        master_ports_frame = ttk.LabelFrame(master_paned, labelwidget=master_label_frame)
         master_paned.add(master_ports_frame, weight=1)
         
         # 创建内部容器框架
@@ -255,7 +271,23 @@ class WGenGUI:
         right_main_paned.add(slave_paned, weight=1)
         
         # Slave上方 - 输入端口列表
-        slave_ports_frame = ttk.LabelFrame(slave_paned, text="Slave Ports")
+        # 创建自定义标签框架
+        slave_label_frame = ttk.Frame(slave_paned)
+        
+        # 添加原有label name
+        slave_label_name = ttk.Label(slave_label_frame, text="Slave Ports")
+        slave_label_name.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # 添加输入框
+        self.slave_search_entry = ttk.Entry(slave_label_frame, width=15)
+        self.slave_search_entry.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # 添加搜索按钮
+        slave_search_button = ttk.Button(slave_label_frame, text="搜索", command=self._on_slave_search)
+        slave_search_button.pack(side=tk.LEFT)
+        
+        # 创建LabelFrame并使用自定义标签框架
+        slave_ports_frame = ttk.LabelFrame(slave_paned, labelwidget=slave_label_frame)
         slave_paned.add(slave_ports_frame, weight=1)
         
         # 创建内部容器框架
@@ -633,7 +665,7 @@ class WGenGUI:
                 save_result = self._save_database()
                 show_str = f"已成功连接 {self.master_module.name}.{master_port} -> {self.slave_module.name}.{slave_port} \n{save_result}"
                 # messagebox.showinfo("成功", show_str)
-                Toast(self.root, show_str, duration=2000, position='center')
+                Toast(self.root, show_str, duration=2000, position='top')
                 self._update_master_display()
                 self._update_slave_display()
             except Exception as e:
@@ -856,7 +888,7 @@ class WGenGUI:
         else:
             messagebox.showwarning("警告", f"未找到端口 {port_name}")
         
-    def _update_master_display(self):
+    def _update_master_display(self, search_regex:str='*'):
         """更新Master相关显示"""
         if self.master_module:
             # 更新输出端口显示
@@ -872,6 +904,10 @@ class WGenGUI:
 
             # 将show_ports 内的port按照direction排序
             show_ports.sort(key=lambda x: x.direction)
+
+            # 应用搜索过滤 search_regex是支持正则表达式的
+            if search_regex != '*':
+                show_ports = [port for port in show_ports if re.search(search_regex, port.name, re.IGNORECASE)]
 
             for port in show_ports:
                 if isinstance(port, VerilogPort):
@@ -894,7 +930,7 @@ class WGenGUI:
             # 更新电路示意图
             self._draw_module_schematic(self.master_canvas, self.master_module)
     
-    def _update_slave_display(self):
+    def _update_slave_display(self, search_regex:str='*'):
         """更新Slave相关显示"""
         if self.slave_module:
             # 更新输入端口显示
@@ -910,6 +946,11 @@ class WGenGUI:
 
             # 将show_ports 内的port按照direction排序
             show_ports.sort(key=lambda x: x.direction)
+
+            # 应用搜索过滤 search_regex是支持正则表达式的
+            if search_regex != '*':
+                show_ports = [port for port in show_ports if re.search(search_regex, port.name, re.IGNORECASE)]
+
 
             for port in show_ports:
                 if isinstance(port, VerilogPort):
@@ -933,6 +974,20 @@ class WGenGUI:
             
             # 更新电路示意图
             self._draw_module_schematic(self.slave_canvas, self.slave_module)
+
+    def _on_master_search(self):
+        """处理Master端口搜索"""
+        if hasattr(self, 'master_search_entry'):
+            self.master_search_text = self.master_search_entry.get()
+            print(f"Master端口名搜索内容: {self.master_search_text}")
+            self._update_master_display(self.master_search_text)
+
+    def _on_slave_search(self):
+        """处理Slave端口搜索"""
+        if hasattr(self, 'slave_search_entry'):
+            self.slave_search_text = self.slave_search_entry.get()
+            print(f"Slave端口名搜索内容: {self.slave_search_text}")
+            self._update_slave_display(self.slave_search_text)
     
     def _show_port_context_menu(self, event):
         """显示端口右键菜单"""
