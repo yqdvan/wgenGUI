@@ -396,6 +396,7 @@ class WGenGUI:
         help_menu.add_command(label="快捷键列表", command= lambda: messagebox.showinfo("快捷键列表", "Space   : Create Connection.\nCtrl+Z  : Undo Last Operation."))  
         help_menu.add_separator()
         help_menu.add_command(label="关于", command=self._show_about_info) 
+        help_menu.add_command(label="ReadMe", command=self._show_readme_info) 
 
         self.root.config(menu=menu_bar)
     
@@ -1872,6 +1873,15 @@ class WGenGUI:
         # 如果是模态窗口，则等待用户关闭
         if modal:
             self.root.wait_window(result_window)
+
+    def _show_readme_info(self):
+        ## 显示readMe信息
+        ## os.path.dirname(__file__)的上一级的README.txt
+        readme_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "README.md")
+        readme_content = "empty!"
+        with open(readme_path, "r", encoding="utf-8") as file:
+            readme_content = file.read()
+        self._show_scolledtext(readme_content, title="ReadMe info")
 
     def _show_about_info(self):
         """显示关于信息对话框
