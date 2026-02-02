@@ -281,7 +281,10 @@ class WgenConfigGenerator(CodeGeneratorInterface):
 
                         cur_dest_bit_low = cur_dest_bit_high - connection._get_width_value(cur_ss_range) + 1
 
-                        src_port_range_str = f"({cur_ss_range['high']}:{cur_ss_range['low']})" 
+                        if(cur_ss_port.get_width_value() > 1):
+                            src_port_range_str = f"({cur_ss_range['high']}:{cur_ss_range['low']})" 
+                        else:
+                            src_port_range_str = ""
                         dst_port_range_str = f"({cur_dest_bit_high}:{cur_dest_bit_low})"   
 
                         connection_lines.append(f"from {cur_ss_port.father_module.name}.{cur_ss_port.name}{src_port_range_str} to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")

@@ -15,7 +15,7 @@ import re
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
-    version = "2.1.0" 
+    version = "2.2.0" 
     
     def __init__(self, root):
         """初始化GUI界面"""
@@ -903,7 +903,7 @@ class WGenGUI:
                 show_ports.extend(self.master_module.get_input_ports())
 
             # 将show_ports 内的port按照direction排序
-            show_ports.sort(key=lambda x: x.direction)
+            show_ports.sort(key=lambda x: (x.direction, x.name))
 
             # 应用搜索过滤 search_regex是支持正则表达式的
             if search_regex != '*':
@@ -945,7 +945,7 @@ class WGenGUI:
                 show_ports.extend(self.slave_module.get_output_ports())
 
             # 将show_ports 内的port按照direction排序
-            show_ports.sort(key=lambda x: x.direction)
+            show_ports.sort(key=lambda x: (x.direction, x.name))
 
             # 应用搜索过滤 search_regex是支持正则表达式的
             if search_regex != '*':
@@ -1320,6 +1320,7 @@ class WGenGUI:
                     for module in module_list:
                         if module.name == current_ins_name:
                             ports_names = [port.name for port in module.ports]
+                            ports_names.sort()
                             break
                 
                 # 如果没有找到对应模块或模块没有端口，则使用默认值
