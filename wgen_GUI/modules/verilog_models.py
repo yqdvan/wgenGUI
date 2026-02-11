@@ -703,6 +703,12 @@ class VerilogModuleCollection:
         # 2.处理已存在的module
         for module in md_list:
             self_md: VerilogModule = self.get_module(module.name)
+            # 2.0 检查module的path是否一致，不一致就更新path
+            # 或许在paser对象中修改更好！但是在这里更直接。
+            if self_md is not None and module.file_path != self_md.file_path:
+                self_md.file_path = module.file_path
+                ans_str += f"VerilogModule {module.name} update path to {module.file_path};\n"
+
             if self_md is not None and module.ports is not None and self_md.ports is not None:
                 # 2.1 更新parameters
                 self_md.parameters = module.parameters.copy()

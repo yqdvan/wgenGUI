@@ -15,7 +15,7 @@ import re
 
 class WGenGUI:
     """Verilog模块互联GUI工具"""
-    version = "2.2.0" 
+    version = "2.2.1" 
     
     def __init__(self, root):
         """初始化GUI界面"""
