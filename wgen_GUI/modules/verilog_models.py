@@ -1424,34 +1424,7 @@ class VerilogModuleCollection:
                 dest_bit_range = conn_info.get('dest_bit_range')
                 connection_type = conn_info.get('type', 'normal')
                 
-                # 如果是tie01端口的连接，直接创建连接对象
-                if source_module_name == collection.system_module.name and source_port_name in ['tie_0', 'tie_1']:
-                    # 获取源端口
-                    source_port = collection.tie_0_port if source_port_name == 'tie_0' else collection.tie_1_port
-                    
-                    # 获取目标模块和端口
-                    dest_module = module_map.get(dest_module_name)
-                    if dest_module:
-                        dest_port = dest_module.get_port(dest_port_name)
-                        if dest_port:
-                            # 直接创建连接对象
-                            connection = VerilogConnection(
-                                source_module=collection.system_module,
-                                source_port=source_port,
-                                dest_module=dest_module,
-                                dest_port=dest_port,
-                                source_bit_range=source_bit_range,
-                                dest_bit_range=dest_bit_range
-                            )
-                            collection.connections.append(connection)
-                            
-                            # 更新端口的源和目的地信息
-                            if dest_port not in source_port.destinations:
-                                source_port.destinations.append(dest_port)
-                            dest_port.source = source_port
-                            continue
-                
-                # 处理合并连接
+                # 先检查是否是合并连接，确保merge类型不会被tie判断拦截
                 if connection_type == 'merge':
                     # 获取所有源端口信息
                     source_port_list = []
@@ -1496,6 +1469,33 @@ class VerilogModuleCollection:
                                     main_source_port.destinations.append(dest_port)
                                 dest_port.source = main_source_port
                                 continue
+                
+                # 然后处理tie01端口的普通连接
+                if source_module_name == collection.system_module.name and source_port_name in ['tie_0', 'tie_1']:
+                    # 获取源端口
+                    source_port = collection.tie_0_port if source_port_name == 'tie_0' else collection.tie_1_port
+                    
+                    # 获取目标模块和端口
+                    dest_module = module_map.get(dest_module_name)
+                    if dest_module:
+                        dest_port = dest_module.get_port(dest_port_name)
+                        if dest_port:
+                            # 直接创建连接对象
+                            connection = VerilogConnection(
+                                source_module=collection.system_module,
+                                source_port=source_port,
+                                dest_module=dest_module,
+                                dest_port=dest_port,
+                                source_bit_range=source_bit_range,
+                                dest_bit_range=dest_bit_range
+                            )
+                            collection.connections.append(connection)
+                            
+                            # 更新端口的源和目的地信息
+                            if dest_port not in source_port.destinations:
+                                source_port.destinations.append(dest_port)
+                            dest_port.source = source_port
+                            continue
                 
                 # 使用现有的add_connection方法来确保所有验证和引用都正确设置
                 collection.add_connection(
@@ -1544,7 +1544,21 @@ class VerilogModuleCollection:
             # 确保元数据包含必要信息
             metadata.setdefault('version', 'unknown')
             metadata.setdefault('save_time', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            metadata.setdefault('user', os.getlogin() if hasattr(os, 'getlogin') else 'unknown')
+            # 尝试多种方式获取用户名，确保在各种环境下都能正常工作
+            user = 'unknown'
+            try:
+                import pwd
+                user = pwd.getpwuid(os.getuid()).pw_name
+            except:
+                pass
+            if user == 'unknown':
+                user = os.environ.get('USER', os.environ.get('LOGNAME', 'unknown'))
+            if user == 'unknown' and hasattr(os, 'getlogin'):
+                try:
+                    user = os.getlogin()
+                except:
+                    pass
+            metadata.setdefault('user', user)
             
             # 将元数据添加到集合字典中
             collection_dict['metadata'] = metadata

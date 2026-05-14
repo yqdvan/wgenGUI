@@ -266,32 +266,38 @@ class WgenConfigGenerator(CodeGeneratorInterface):
                 src_port_range_str = f"({connection.source_bit_range['high']}:{connection.source_bit_range['low']})" 
                 dst_port_range_str = f"({connection.dest_bit_range['high']}:{connection.dest_bit_range['low']})" 
 
-            if connection.source_port.name == "tie_0":
+            # 先判断是否是MergeConnection，确保能处理所有源端口（包括tie和真实端口）
+            if isinstance(connection, VerilogMergeConnection):  
+                cur_dest_bit_high = connection.dest_port.width['high']
+                cur_dest_bit_low  = connection.dest_port.width['high'] 
+
+                for idx in range(connection.source_port_list.__len__()):
+                    cur_ss_port = connection.source_port_list[idx]
+                    cur_ss_range = connection.source_range_list[idx]
+
+                    cur_dest_bit_low = cur_dest_bit_high - connection._get_width_value(cur_ss_range) + 1
+
+                    if(cur_ss_port.get_width_value() > 1):
+                        src_port_range_str = f"({cur_ss_range['high']}:{cur_ss_range['low']})" 
+                    else:
+                        src_port_range_str = ""
+                    dst_port_range_str = f"({cur_dest_bit_high}:{cur_dest_bit_low})"   
+
+                    # 在MergeConnection内部判断每个源端口是否是tie端口
+                    if cur_ss_port.name == "tie_0":
+                        connection_lines.append(f"from \"all_0\"  to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
+                    elif cur_ss_port.name == "tie_1":
+                        connection_lines.append(f"from \"all_1\"  to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
+                    else:
+                        connection_lines.append(f"from {cur_ss_port.father_module.name}.{cur_ss_port.name}{src_port_range_str} to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
+                    
+                    cur_dest_bit_high = cur_dest_bit_low -1 # next use
+            elif connection.source_port.name == "tie_0":
                 connection_lines.append(f"from \"all_0\"  to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
             elif connection.source_port.name == "tie_1":
                 connection_lines.append(f"from \"all_1\"  to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
             else:
-                if isinstance(connection, VerilogMergeConnection):  
-                    cur_dest_bit_high = connection.dest_port.width['high']
-                    cur_dest_bit_low  = connection.dest_port.width['high'] 
-
-                    for idx in range(connection.source_port_list.__len__()):
-                        cur_ss_port = connection.source_port_list[idx]
-                        cur_ss_range = connection.source_range_list[idx]
-
-                        cur_dest_bit_low = cur_dest_bit_high - connection._get_width_value(cur_ss_range) + 1
-
-                        if(cur_ss_port.get_width_value() > 1):
-                            src_port_range_str = f"({cur_ss_range['high']}:{cur_ss_range['low']})" 
-                        else:
-                            src_port_range_str = ""
-                        dst_port_range_str = f"({cur_dest_bit_high}:{cur_dest_bit_low})"   
-
-                        connection_lines.append(f"from {cur_ss_port.father_module.name}.{cur_ss_port.name}{src_port_range_str} to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
-                        
-                        cur_dest_bit_high = cur_dest_bit_low -1 # next use
-                else:
-                    connection_lines.append(f"from {connection.source_module_name}.{connection.source_port.name}{src_port_range_str} to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
+                connection_lines.append(f"from {connection.source_module_name}.{connection.source_port.name}{src_port_range_str} to  {{ {connection.dest_module_name}.{connection.dest_port.name}{dst_port_range_str} }}")
         
         connection_lines.append(f" ")
         return "\n".join(connection_lines)
