@@ -185,6 +185,7 @@ class WGenGUI:
         self.module_menu.add_command(label="设为Master", command=self._set_as_master)
         self.module_menu.add_command(label="设为Slave", command=self._set_as_slave)
         self.module_menu.add_separator()
+        self.module_menu.add_command(label="Open RTL", command=self._open_rtl_with_gvim)
         self.module_menu.add_command(label="属性", command=self._show_module_properties)
         
     def _create_right_panel(self):
@@ -830,6 +831,28 @@ class WGenGUI:
                     # button.pack(pady=5)          
                     self._show_scolledtext(properties, "模块属性")          
                     break
+
+    def _open_rtl_with_gvim(self):
+        """使用gvim打开选中模块的RTL文件"""
+        selected_item = self.modules_tree.selection()
+
+        if selected_item:
+            module_name = self.modules_tree.item(selected_item[0])['values'][0]
+            md_obj:VerilogModule = self.parser.get_module_by_name(self.modules, module_name)
+            
+            if md_obj.file_path:
+                import subprocess
+                print("file_path: "+md_obj.file_path)
+                abs_path = os.path.expandvars(md_obj.file_path)
+                if(md_obj.need_gen):
+                    abs_path = abs_path + "/" + md_obj.name + ".v"
+                print("abs_path: "+abs_path)
+                
+                subprocess.Popen(['gvim', abs_path])
+            else:
+                messagebox.showwarning("警告", "该模块没有关联的RTL文件路径！")
+            return
+
 
     def _set_as_master(self):
         """将选中的模块设为Master"""
