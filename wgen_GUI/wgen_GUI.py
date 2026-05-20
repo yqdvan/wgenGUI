@@ -415,6 +415,12 @@ class WGenGUI:
 
     def _execute_sh_command(self):
         """执行命令并收集输出，通过_scolledtext展示结果"""
+        SCRIPT_CONTENT = f"""\
+#!/bin/bash
+# 脚本接收一个参数，打印它
+echo "参数: $1"
+wgen $1.config
+"""        
         try:
             # 根据平台选择命令
             if sys.platform == 'win32':
@@ -424,18 +430,37 @@ class WGenGUI:
                                       capture_output=True, text=True, timeout=5)
             else:
                 # Linux
-                self._export_wgen_config("/tmp/wgen_config.config")
-                cmd :str = "for ((i=1; i<=20; i++)); do echo \"hello$i\"; done"
-                cmd :str = "wgen /tmp/wgen_config.config"
-                result = subprocess.run(cmd, shell=True, 
-                                      capture_output=True, text=True, timeout=5)
-            
+                # self._export_wgen_config("/tmp/wgen_config.config")
+                # cmd :str = "for ((i=1; i<=20; i++)); do echo \"hello$i\"; done"
+                # cmd :str = "wgen /tmp/wgen_config.config"
+                # result = subprocess.run(cmd, shell=True, 
+                #                       capture_output=True, text=True, timeout=5)
+                file = "wgen_gui_user.sh"
+                result = ""
+                if not os.path.exists(file):
+                    with open(file, "w") as f:
+                        f.write(SCRIPT_CONTENT)
+                    os.chmod(file, 0o755)
+                    # 此处只创建，不执行
+                    result = False
+                    cmd = f"Please eidt the file {file}. then try again."
+                else:
+                    self._export_wgen_config(f"./{self.top_module.name}.config")
+                    cmd = ["bash", file, self.top_module.name]
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+
             output :str = f"命令:\n{cmd}\n\n"  
             # 收集输出
-            output += f"标准输出:\n{result.stdout}\n"
-            if result.stderr:
-                output += f"标准错误:\n{result.stderr}\n"
-            output += f"返回码: {result.returncode}"
+            if result:
+                output += f"标准输出:\n{result.stdout}\n"
+                if result.stderr:
+                    output += f"标准错误:\n{result.stderr}\n"
+                output += f"返回码: {result.returncode}"
             
             # 使用_show_scolledtext显示结果
             self._show_scolledtext(output, title="命令执行结果", modal=False)
@@ -1764,6 +1789,7 @@ class WGenGUI:
                 is_last_top = (i == len(top_modules) - 1)
                 # 生成top模块的层次结构文本
                 module_text = self._generate_module_hierarchy_text(top_module, 0, is_last_top)
+                self.top_module = top_module
                 hierarchy_text += module_text + "\n\n"
         
         # 在文本框中显示层次结构
